@@ -1,0 +1,2429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>RoomSync</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #E2E8F0; }
+    body { display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; font-family: 'Inter', system-ui, sans-serif; }
+    #root { width: 100%; max-width: 430px; min-height: 100vh; background: #F8FAFC; }
+    @media (min-width: 500px) {
+      body { align-items: center; padding: 24px 0; }
+      #root { border-radius: 44px; overflow: hidden; box-shadow: 0 32px 80px rgba(0,0,0,0.20), 0 0 0 10px #CBD5E1; min-height: 720px; max-height: 880px; }
+    }
+    input, select, button { font-family: inherit; outline: none; -webkit-appearance: none; }
+    button { cursor: pointer; }
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ── TOKENS ───────────────────────────────────────────────────────────────────
+const T = {
+  teal:"#0D9488", tealDk:"#0F766E", teal10:"#F0FDFA", teal20:"#CCFBF1",
+  mint:"#10B981",
+  red:"#EF4444",   red10:"#FEF2F2",
+  amber:"#F59E0B", amber10:"#FFFBEB",
+  blue:"#3B82F6",  blue10:"#EFF6FF",
+  purple:"#8B5CF6",
+  g50:"#F8FAFC", g100:"#F1F5F9", g200:"#E2E8F0", g300:"#CBD5E1",
+  g400:"#94A3B8", g500:"#64748B", g600:"#475569", g700:"#334155",
+  g800:"#1E293B", g900:"#0F172A", white:"#FFFFFF",
+};
+
+// ── SVG ICONS (no emojis) ────────────────────────────────────────────────────
+const Icon = {
+  home:      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  agreement: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
+  chores:    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+  expenses:  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+  amenities: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  check:     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  copy:      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
+  share:     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>,
+  qr:        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="5" y="5" width="3" height="3" fill="currentColor"/><rect x="16" y="5" width="3" height="3" fill="currentColor"/><rect x="16" y="16" width="3" height="3" fill="currentColor"/><rect x="5" y="16" width="3" height="3" fill="currentColor"/></svg>,
+  link:      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+  warn:      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  user:      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  lock:      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+  arrowR:    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
+  arrowL:    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>,
+  bell:      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+  refresh:   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
+  heart:     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  plus:      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  clock:     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  sparkle:   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  upload:    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>,
+  mail:      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+  msg:       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  phone:     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
+  trash:     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+};
+
+// ── DATA ─────────────────────────────────────────────────────────────────────
+// Demo member pool — used to populate the household based on count chosen in onboarding
+const MEMBER_COLORS = [
+  {color:T.teal,  bg:T.teal10 },
+  {color:T.blue,  bg:T.blue10 },
+  {color:T.amber, bg:T.amber10},
+  {color:"#8B5CF6", bg:"#F5F3FF"},
+  {color:T.mint,  bg:"#ECFDF5" },
+];
+const DEMO_NAMES = [
+  {name:"Maya K.",   short:"Maya",    initials:"MK"},
+  {name:"Sam R.",    short:"Sam",     initials:"SR"},
+  {name:"Jordan T.", short:"Jordan",  initials:"JT"},
+  {name:"Alex P.",   short:"Alex",    initials:"AP"},
+];
+
+// Build member list: member 1 = current user (initiator), rest = demo names up to cnt
+function buildMembers(currentUser, cnt) {
+  const me = {
+    id:1,
+    name: currentUser.name.includes(" ") ? currentUser.name : currentUser.name + " L.",
+    short: currentUser.name.split(" ")[0],
+    initials: currentUser.initials || currentUser.name.slice(0,2).toUpperCase(),
+    color: T.teal, bg: T.teal10, role:"Initiator",
+  };
+  const others = Array.from({length: cnt - 1}, (_, i) => ({
+    id: i + 2,
+    ...DEMO_NAMES[i] || {name:`Member ${i+2}`, short:`M${i+2}`, initials:`M${i+2}`},
+    ...MEMBER_COLORS[i + 1] || MEMBER_COLORS[1],
+    role: "Member",
+  }));
+  return [me, ...others];
+}
+
+// Default members for screens that need them before App state is ready
+const MEMBERS_DEFAULT = [
+  { id:1, name:"Leticia L.", short:"Leticia", initials:"LL", color:T.teal,  bg:T.teal10,  role:"Initiator" },
+  { id:2, name:"Maya K.",    short:"Maya",    initials:"MK", color:T.blue,  bg:T.blue10,  role:"Member" },
+  { id:3, name:"Sam R.",     short:"Sam",     initials:"SR", color:T.amber, bg:T.amber10, role:"Member" },
+];
+
+// Chore data is managed inside the Chores component via CHORE_TEMPLATES_INIT
+// Expenses: "by" = who paid upfront. "settled" = which other members have paid them back.
+// Money NEVER moves through the app — this is purely a record-keeping check-off.
+// When you "mark as paid" you are confirming you paid back the person who covered the bill.
+const EXPENSES_INIT = [
+  {id:2, desc:"Hydro Bill",           amount:87.50, by:2, date:"Apr 3",  category:"utilities", settled:{1:false, 3:false}},
+  {id:3, desc:"Internet",             amount:65,    by:1, date:"Apr 3",  category:"utilities", settled:{2:false, 3:false}},
+  {id:4, desc:"Dish soap & supplies", amount:34.20, by:3, date:"Apr 5",  category:"household", settled:{1:false, 2:false}},
+  {id:5, desc:"Netflix",              amount:18,    by:2, date:"Apr 8",  category:"subscriptions", settled:{1:true, 3:false}},
+  {id:6, desc:"Toilet paper (x4)",    amount:12.80, by:1, date:"Apr 9",  category:"household", settled:{2:true, 3:true}},
+];
+const SLOTS = ["7am","8am","9am","10am","11am","12pm","1pm","2pm","3pm","4pm","5pm","6pm","7pm","8pm","9pm"];
+
+// small icon for topic rows
+function TopicIcon({id, size=20}) {
+  const icons = {
+    moon:  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={T.g500} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+    clean: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={T.g500} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3l18 18M8.5 8.5A9.95 9.95 0 0 0 5 14c0 2.76 1.12 5.26 2.93 7.07"/><path d="M16 16c-1.1.66-2.37 1-3.69 1A7 7 0 0 1 5 10c0-1.32.34-2.59 1-3.69"/><path d="M12 3v3M21 12h-3M12 21v-3M3 12h3"/></svg>,
+    guest: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={T.g500} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+    bill:  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={T.g500} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+    noise: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={T.g500} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>,
+    dish:  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={T.g500} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z"/><path d="M12 8v4l3 3"/></svg>,
+    laundry:<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={T.g500} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="19" rx="2"/><path d="M9 10a3 3 0 1 0 6 0 3 3 0 0 0-6 0z"/><line x1="5" y1="6" x2="5.01" y2="6"/><line x1="8" y1="6" x2="8.01" y2="6"/></svg>,
+    kitchen:<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={T.g500} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>,
+    shower:<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={T.g500} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12a8 8 0 0 1 16 0Z"/><path d="M12 12v6"/><path d="M8 17l1-1"/><path d="M12 18l0 .01"/><path d="M16 17l-1-1"/></svg>,
+    living:<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={T.g500} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1H8v-1a2 2 0 0 0-4 0v5z"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>,
+  };
+  return icons[id] || null;
+}
+
+// ── UI ATOMS ─────────────────────────────────────────────────────────────────
+function Av({m, size=36}) {
+  return <div style={{width:size,height:size,borderRadius:"50%",background:m.bg,border:`2px solid ${m.color}33`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.33,fontWeight:700,color:m.color,flexShrink:0,letterSpacing:-0.5}}>{m.initials}</div>;
+}
+function Pill({label,color=T.teal}) {
+  return <span style={{display:"inline-flex",alignItems:"center",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20,background:color+"18",color,whiteSpace:"nowrap"}}>{label}</span>;
+}
+function Bar({pct,color=T.teal,h=5}) {
+  return <div style={{background:T.g100,borderRadius:99,height:h,overflow:"hidden"}}><div style={{width:`${pct}%`,height:"100%",background:color,borderRadius:99,transition:"width 0.5s"}}/></div>;
+}
+function Ring({pct,size=64,sw=5,color=T.teal}) {
+  const r=(size-sw*2)/2,c=2*Math.PI*r,d=(pct/100)*c;
+  return <svg width={size} height={size}><circle cx={size/2} cy={size/2} r={r} fill="none" stroke={T.g100} strokeWidth={sw}/><circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={sw} strokeDasharray={`${d} ${c}`} strokeDashoffset={c*0.25} strokeLinecap="round" style={{transition:"stroke-dasharray 0.5s"}}/><text x={size/2} y={size/2+5} textAnchor="middle" fill={color} fontSize={size*0.22} fontWeight={700} fontFamily="Inter">{pct}%</text></svg>;
+}
+function Card({children,style={},border,onClick}) {
+  return <div onClick={onClick} style={{background:T.white,borderRadius:16,border:`1px solid ${border||T.g200}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden",cursor:onClick?"pointer":undefined,...style}}>{children}</div>;
+}
+function TopBar({title,sub,back,right}) {
+  return <div style={{background:T.white,borderBottom:`1px solid ${T.g100}`,padding:"14px 20px",display:"flex",alignItems:"center",gap:10,position:"sticky",top:0,zIndex:20}}>
+    {back&&<button onClick={back} style={{background:"none",border:"none",color:T.g500,display:"flex",alignItems:"center",marginLeft:-4,marginRight:2}}>{Icon.arrowL}</button>}
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{fontSize:17,fontWeight:700,color:T.g900,lineHeight:1.2}}>{title}</div>
+      {sub&&<div style={{fontSize:12,color:T.g400,marginTop:2}}>{sub}</div>}
+    </div>
+    {right}
+  </div>;
+}
+function Sec({label}) {
+  return <div style={{fontSize:11,fontWeight:700,color:T.g400,letterSpacing:1,textTransform:"uppercase",padding:"16px 20px 8px"}}>{label}</div>;
+}
+const inp = {width:"100%",border:`1.5px solid ${T.g200}`,borderRadius:10,padding:"11px 14px",fontSize:14,color:"#0F172A",background:"#FFFFFF",boxSizing:"border-box"};
+
+// ── JOIN FLOW (invite link) ──────────────────────────────────────────────────
+function JoinFlow({go}) {
+  const MEMBERS = MEMBERS_DEFAULT; // for household preview in join flow
+  const [phase, setPhase] = useState("code"); // code | details | pin | success
+  const [code, setCode]   = useState("");
+  const [name, setName]   = useState("");
+  const [pin,  setPin]    = useState(["","","",""]);
+  const [err,  setErr]    = useState("");
+  const pinRefs = [useRef(null),useRef(null),useRef(null),useRef(null)];
+
+  const VALID_CODE = "SUNSET-7F2K";
+
+  function submitCode() {
+    if (code.trim().toUpperCase() === VALID_CODE) { setErr(""); setPhase("details"); }
+    else setErr("Invalid invite code. Please check the link or code and try again.");
+  }
+
+  function submitDetails() {
+    if (!name.trim()) { setErr("Please enter your name."); return; }
+    setErr(""); setPhase("pin");
+    setTimeout(() => pinRefs[0].current && pinRefs[0].current.focus(), 100);
+  }
+
+  function handlePin(i, val) {
+    if (!/^\d?$/.test(val)) return;
+    const next = [...pin]; next[i] = val; setPin(next);
+    if (val && i < 3) pinRefs[i+1].current && pinRefs[i+1].current.focus();
+  }
+
+  function handlePinKey(i, e) {
+    if (e.key === "Backspace" && !pin[i] && i > 0) pinRefs[i-1].current && pinRefs[i-1].current.focus();
+  }
+
+  function submitPin() {
+    if (pin.join("").length < 4) { setErr("Please enter all 4 digits."); return; }
+    setErr(""); setPhase("success");
+  }
+
+  if (phase === "code") return (
+    <div style={{padding:"40px 24px 32px",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+      <button onClick={()=>go("onboarding")} style={{background:"none",border:"none",color:T.g400,display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:500,marginBottom:28,alignSelf:"flex-start"}}>
+        {Icon.arrowL}<span>Back</span>
+      </button>
+      <div style={{width:48,height:48,borderRadius:14,background:T.teal10,border:`1px solid ${T.teal20}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.teal,marginBottom:16}}>
+        {Icon.link}
+      </div>
+      <div style={{fontSize:24,fontWeight:800,color:T.g900,marginBottom:6}}>Join a household</div>
+      <div style={{fontSize:14,color:T.g500,marginBottom:32,lineHeight:1.6}}>Enter the invite code from the link your housemate shared with you.</div>
+
+      <label style={{fontSize:12,fontWeight:600,color:T.g500,display:"block",marginBottom:6}}>Invite code</label>
+      <input
+        value={code} onChange={e => setCode(e.target.value.toUpperCase())}
+        onKeyDown={e => e.key === "Enter" && submitCode()}
+        placeholder="e.g. SUNSET-7F2K"
+        style={{...inp, fontFamily:"monospace", fontSize:16, letterSpacing:2, textTransform:"uppercase", borderColor: err ? T.red : T.g200, marginBottom:8}}
+      />
+      {err && (
+        <div style={{display:"flex",alignItems:"center",gap:6,color:T.red,fontSize:12,fontWeight:500,marginBottom:12}}>
+          <span style={{color:T.red,flexShrink:0}}>{Icon.warn}</span>{err}
+        </div>
+      )}
+      <div style={{fontSize:12,color:T.g400,marginBottom:28,lineHeight:1.5}}>
+        The invite code is included in the link your housemate sent you — it's the part after the last slash. For this demo, enter: <strong style={{color:T.teal,fontFamily:"monospace"}}>SUNSET-7F2K</strong>
+      </div>
+      <button onClick={submitCode} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700}}>
+        Verify Code
+      </button>
+    </div>
+  );
+
+  if (phase === "details") return (
+    <div style={{padding:"40px 24px 32px",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+      <button onClick={()=>setPhase("code")} style={{background:"none",border:"none",color:T.g400,display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:500,marginBottom:28,alignSelf:"flex-start"}}>
+        {Icon.arrowL}<span>Back</span>
+      </button>
+
+      {/* Household preview */}
+      <div style={{background:T.teal10,border:`1px solid ${T.teal20}`,borderRadius:14,padding:"14px 16px",marginBottom:28}}>
+        <div style={{fontSize:11,fontWeight:600,color:T.g400,marginBottom:4}}>You're joining</div>
+        <div style={{fontSize:17,fontWeight:700,color:T.g900}}>Sunset Ave</div>
+        <div style={{fontSize:13,color:T.g500,marginTop:2}}>Vancouver · 2 members already joined</div>
+        <div style={{display:"flex",gap:6,marginTop:10}}>
+          {MEMBERS.slice(0,2).map(m=><Av key={m.id} m={m} size={28}/>)}
+          <div style={{width:28,height:28,borderRadius:"50%",background:T.g100,border:`2px solid ${T.g200}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:T.g400,fontWeight:600}}>+1</div>
+        </div>
+      </div>
+
+      <div style={{fontSize:24,fontWeight:800,color:T.g900,marginBottom:6}}>Tell us your name</div>
+      <div style={{fontSize:14,color:T.g500,marginBottom:24,lineHeight:1.6}}>This is how your housemates will see you in the app.</div>
+
+      <label style={{fontSize:12,fontWeight:600,color:T.g500,display:"block",marginBottom:6}}>Your first name</label>
+      <input
+        value={name} onChange={e=>setName(e.target.value)}
+        onKeyDown={e => e.key==="Enter" && submitDetails()}
+        placeholder="First name"
+        style={{...inp, borderColor: err ? T.red : T.g200, marginBottom: err ? 8 : 24}}
+      />
+      {err && <div style={{display:"flex",alignItems:"center",gap:6,color:T.red,fontSize:12,fontWeight:500,marginBottom:16}}><span style={{color:T.red,flexShrink:0}}>{Icon.warn}</span>{err}</div>}
+
+      <button onClick={submitDetails} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700}}>
+        Continue
+      </button>
+      <div style={{fontSize:11,color:T.g400,textAlign:"center",marginTop:14,lineHeight:1.5}}>
+        No email verification required at join. Your details are only visible to your housemates.
+      </div>
+    </div>
+  );
+
+  if (phase === "pin") return (
+    <div style={{padding:"40px 24px 32px",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+      <button onClick={()=>setPhase("details")} style={{background:"none",border:"none",color:T.g400,display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:500,marginBottom:28,alignSelf:"flex-start"}}>
+        {Icon.arrowL}<span>Back</span>
+      </button>
+      <div style={{width:48,height:48,borderRadius:14,background:T.teal10,border:`1px solid ${T.teal20}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.teal,marginBottom:16}}>
+        {Icon.lock}
+      </div>
+      <div style={{fontSize:24,fontWeight:800,color:T.g900,marginBottom:6}}>Create your PIN</div>
+      <div style={{fontSize:14,color:T.g500,marginBottom:32,lineHeight:1.6}}>
+        Choose a 4-digit PIN, <strong>{name}</strong>. You'll use this to access your household.
+      </div>
+
+      <div style={{display:"flex",gap:12,justifyContent:"center",marginBottom:8}}>
+        {pin.map((digit,i) => (
+          <input
+            key={i} ref={pinRefs[i]}
+            type="text" inputMode="numeric" maxLength={1}
+            value={digit} onChange={e => handlePin(i, e.target.value)}
+            onKeyDown={e => handlePinKey(i, e)}
+            style={{
+              width:60,height:68,textAlign:"center",fontSize:28,fontWeight:700,
+              border:`2px solid ${digit ? T.teal : err ? T.red : T.g200}`,
+              borderRadius:14,background:digit ? T.teal10 : T.white,
+              color:T.g900,boxSizing:"border-box",
+            }}
+          />
+        ))}
+      </div>
+      {err && <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,color:T.red,fontSize:12,fontWeight:500,marginBottom:8}}><span style={{color:T.red,flexShrink:0}}>{Icon.warn}</span>{err}</div>}
+      <div style={{fontSize:12,color:T.g400,textAlign:"center",marginBottom:28}}>This PIN keeps your account secure.</div>
+
+      <button onClick={submitPin} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700}}>
+        Join Household
+      </button>
+    </div>
+  );
+
+  // Success
+  return (
+    <div style={{padding:"40px 24px 32px",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center"}}>
+      <div style={{width:72,height:72,borderRadius:"50%",background:T.teal10,border:`2px solid ${T.teal20}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.teal,marginBottom:20}}>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div style={{fontSize:24,fontWeight:800,color:T.g900,marginBottom:6}}>You're in, {name}!</div>
+      <div style={{fontSize:14,color:T.g500,marginBottom:32,lineHeight:1.6,maxWidth:280}}>
+        You've joined <strong>Sunset Ave</strong>. Your housemates have been notified.
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:10,width:"100%",marginBottom:28}}>
+        {MEMBERS.map(m=>(
+          <div key={m.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:T.teal10,border:`1px solid ${T.teal20}`,borderRadius:12}}>
+            <Av m={m} size={36}/>
+            <div style={{textAlign:"left"}}>
+              <div style={{fontSize:13,fontWeight:600,color:T.g800}}>{m.name}</div>
+              <div style={{fontSize:12,color:T.teal}}>Already joined</div>
+            </div>
+            <div style={{marginLeft:"auto",color:T.teal}}>{Icon.check}</div>
+          </div>
+        ))}
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:T.white,border:`1.5px solid ${T.teal}`,borderRadius:12}}>
+          <div style={{width:36,height:36,borderRadius:"50%",background:T.teal10,border:`2px solid ${T.teal}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:T.teal,flexShrink:0}}>{name.slice(0,2).toUpperCase()}</div>
+          <div style={{textAlign:"left"}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.g800}}>{name} (You)</div>
+            <div style={{fontSize:12,color:T.teal}}>Just joined</div>
+          </div>
+          <div style={{marginLeft:"auto",color:T.teal}}>{Icon.check}</div>
+        </div>
+      </div>
+      <button onClick={()=>go(name)} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700}}>
+        Go to Dashboard
+      </button>
+    </div>
+  );
+}
+
+// ── ONBOARDING ────────────────────────────────────────────────────────────────
+function Onboard({go}) {
+  const [step,          setStep]          = useState(0);
+  const [initiatorName, setInitiatorName] = useState("Leticia");
+  const [nm,            setNm]            = useState("Sunset Ave");
+  const [ct,            setCt]            = useState("Vancouver");
+  const [cnt,           setCnt]           = useState(3);
+  const [joined,        setJoined]        = useState([1]);
+  const [tab,           setTab]           = useState("link");
+  const [copied,        setCopied]        = useState(false);
+  const qrRef                             = useRef(null);
+  // Build demo member list dynamically based on cnt and initiator name
+  const demoMembers = buildMembers({name:initiatorName||"Leticia",initials:(initiatorName||"LE").slice(0,2).toUpperCase()}, cnt);
+  const done        = joined.length === cnt;
+  const INVITE_CODE = nm.trim().split(" ")[0].toUpperCase()+"-7F2K";
+  const FULL_LINK   = `https://roomsync.app/join/${nm.toLowerCase().replace(/\s+/g,"-")}-7f2k`;
+
+  useEffect(() => {
+    if (step !== 2 || tab !== "qr" || !qrRef.current) return;
+    qrRef.current.innerHTML = "";
+    if (window.QRCode) new window.QRCode(qrRef.current, {text:FULL_LINK,width:200,height:200,colorDark:T.tealDk,colorLight:T.white,correctLevel:window.QRCode.CorrectLevel.M});
+  }, [step, tab]);
+
+  function copyLink() {
+    const copy = () => { setCopied(true); setTimeout(()=>setCopied(false),2200); };
+    if (navigator.clipboard) navigator.clipboard.writeText(FULL_LINK).then(copy);
+    else { const ta=document.createElement("textarea");ta.value=FULL_LINK;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);copy(); }
+  }
+  function shareVia(ch) {
+    const msg=`Join our RoomSync household "${nm}"! Use code ${INVITE_CODE} or tap: ${FULL_LINK}`;
+    const urls={whatsapp:`https://wa.me/?text=${encodeURIComponent(msg)}`,sms:`sms:?body=${encodeURIComponent(msg)}`,email:`mailto:?subject=${encodeURIComponent("Join our RoomSync household")}&body=${encodeURIComponent(msg)}`};
+    if(urls[ch]) window.open(urls[ch],"_blank");
+  }
+
+  if(step===0) return (
+    <div style={{padding:"40px 24px 32px",display:"flex",flexDirection:"column",alignItems:"center"}}>
+      <div style={{width:56,height:56,borderRadius:18,background:T.teal10,border:`1.5px solid ${T.teal20}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.teal,marginBottom:16}}>{Icon.home}</div>
+      <div style={{fontSize:28,fontWeight:800,color:T.g900,letterSpacing:-0.5,marginBottom:6}}>RoomSync</div>
+      <div style={{fontSize:14,color:T.g500,textAlign:"center",marginBottom:32,lineHeight:1.7}}>Conflict-free shared living — by design.</div>
+      <div style={{width:"100%",display:"flex",flexDirection:"column",gap:8,marginBottom:28}}>
+        {[
+          {icon:"agreement", label:"Agreement Builder",   desc:"Co-sign house rules before move-in"},
+          {icon:"chores",    label:"Chore Rotation",      desc:"Transparent auto-rotating schedule"},
+          {icon:"expenses",  label:"Expense Tracker",     desc:"Split bills with running balances"},
+          {icon:"amenities", label:"Amenities Scheduler", desc:"Book shared spaces — no clashes"},
+          {icon:"link",      label:"Household Onboarding",desc:"One link — everyone in under 10 min"},
+        ].map((f,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 16px",background:T.g50,borderRadius:12,border:`1px solid ${T.g100}`}}>
+            <div style={{color:T.teal,flexShrink:0}}>{Icon[f.icon]||Icon.agreement}</div>
+            <div>
+              <div style={{fontSize:13,fontWeight:600,color:T.g800}}>{f.label}</div>
+              <div style={{fontSize:12,color:T.g400,marginTop:1}}>{f.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button onClick={()=>setStep(1)} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700,marginBottom:10}}>Create a household</button>
+      <button onClick={()=>go("join")} style={{width:"100%",background:"none",border:`1.5px solid ${T.g200}`,borderRadius:12,padding:"13px",color:T.g600,fontSize:14,fontWeight:500}}>I have an invite link</button>
+    </div>
+  );
+
+  if(step===1) return (
+    <div style={{padding:"28px 24px 32px"}}>
+      <div style={{fontSize:11,fontWeight:700,color:T.teal,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Step 1 of 3</div>
+      <div style={{fontSize:22,fontWeight:800,color:T.g900,marginBottom:20}}>Set up your household</div>
+      <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:T.g500,display:"block",marginBottom:6}}>Your first name</label><input value={initiatorName} onChange={e=>setInitiatorName(e.target.value)} placeholder="e.g. Leticia" style={{...inp,borderColor:T.teal}}/></div>
+      <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:T.g500,display:"block",marginBottom:6}}>Household name</label><input value={nm} onChange={e=>setNm(e.target.value)} style={inp}/></div>
+      <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:T.g500,display:"block",marginBottom:6}}>City</label><select value={ct} onChange={e=>setCt(e.target.value)} style={inp}>{["Vancouver","Toronto","Calgary","Edmonton","Montreal"].map(c=><option key={c}>{c}</option>)}</select></div>
+      <div style={{marginBottom:28}}>
+        <label style={{fontSize:12,fontWeight:600,color:T.g500,display:"block",marginBottom:8}}>Number of roommates (including you)</label>
+        <div style={{display:"flex",gap:8}}>{[2,3,4,5].map(n=><button key={n} onClick={()=>setCnt(n)} style={{flex:1,background:cnt===n?T.teal:T.white,border:`1.5px solid ${cnt===n?T.teal:T.g200}`,borderRadius:10,padding:"11px",color:cnt===n?T.white:T.g600,fontWeight:700,fontSize:16}}>{n}</button>)}</div>
+      </div>
+      <button onClick={()=>{ if(initiatorName.trim()) setStep(2); }} style={{width:"100%",background:initiatorName.trim()?T.teal:T.g300,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700}}>Next — Generate Invite Link</button>
+    </div>
+  );
+
+  if(step===2) return (
+    <div style={{padding:"0 0 32px"}}>
+      <div style={{padding:"28px 24px 0"}}>
+        <div style={{fontSize:11,fontWeight:700,color:T.teal,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Step 2 of 3</div>
+        <div style={{fontSize:22,fontWeight:800,color:T.g900,marginBottom:4}}>Share with your roommates</div>
+        <div style={{fontSize:13,color:T.g400,marginBottom:22,lineHeight:1.6}}>One link or code works for everyone — no per-member invites needed.</div>
+
+        {/* Tab toggle */}
+        <div style={{display:"flex",background:T.g100,borderRadius:12,padding:4,marginBottom:18}}>
+          {[{id:"link",label:"Link & Code",Icon:Icon.link},{id:"qr",label:"QR Code",Icon:Icon.qr}].map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,background:tab===t.id?T.white:"transparent",border:"none",borderRadius:9,padding:"9px 0",fontSize:13,fontWeight:600,color:tab===t.id?T.g800:T.g400,display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:tab===t.id?"0 1px 4px rgba(0,0,0,0.09)":undefined,transition:"all 0.2s"}}>
+              <span style={{color:tab===t.id?T.teal:T.g400}}>{t.Icon}</span>{t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab==="link"&&<>
+          {/* Invite code pill */}
+          <div style={{background:T.g50,border:`1px solid ${T.g200}`,borderRadius:12,padding:"12px 16px",marginBottom:10}}>
+            <div style={{fontSize:11,fontWeight:600,color:T.g400,marginBottom:4}}>Invite code</div>
+            <div style={{fontSize:20,fontWeight:800,color:T.g900,fontFamily:"monospace",letterSpacing:2}}>{INVITE_CODE}</div>
+            <div style={{fontSize:11,color:T.g400,marginTop:4}}>Share this code — or send the link below</div>
+          </div>
+          {/* Link box */}
+          <div style={{background:T.teal10,border:`1.5px solid ${T.teal20}`,borderRadius:12,padding:"12px 16px",marginBottom:12}}>
+            <div style={{fontSize:11,fontWeight:600,color:T.g400,marginBottom:4}}>Full invite link · expires in 7 days</div>
+            <div style={{fontSize:12,color:T.tealDk,fontWeight:600,fontFamily:"monospace",wordBreak:"break-all",lineHeight:1.5}}>{FULL_LINK}</div>
+          </div>
+          {/* Copy */}
+          <button onClick={copyLink} style={{width:"100%",background:copied?T.mint:T.teal,border:"none",borderRadius:12,padding:"13px",color:T.white,fontSize:14,fontWeight:700,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"background 0.3s"}}>
+            <span style={{color:T.white}}>{copied?Icon.check:Icon.copy}</span>
+            {copied?"Copied to clipboard!":"Copy Link"}
+          </button>
+          <div style={{fontSize:12,fontWeight:500,color:T.g400,textAlign:"center",marginBottom:10}}>— or send directly via —</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+            {[{id:"whatsapp",icon:Icon.msg,label:"WhatsApp"},{id:"sms",icon:Icon.phone,label:"SMS"},{id:"email",icon:Icon.mail,label:"Email"}].map(ch=>(
+              <button key={ch.id} onClick={()=>shareVia(ch.id)} style={{background:T.white,border:`1.5px solid ${T.g200}`,borderRadius:12,padding:"12px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
+                <span style={{color:T.teal}}>{ch.icon}</span>
+                <span style={{fontSize:12,fontWeight:600,color:T.g600}}>{ch.label}</span>
+              </button>
+            ))}
+          </div>
+          <button onClick={()=>{if(navigator.share)navigator.share({title:`Join RoomSync: ${nm}`,url:FULL_LINK}).catch(()=>{});else copyLink();}} style={{width:"100%",background:T.white,border:`1.5px solid ${T.g200}`,borderRadius:12,padding:"12px",color:T.g600,fontSize:14,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <span style={{color:T.g500}}>{Icon.upload}</span> More share options
+          </button>
+        </>}
+
+        {tab==="qr"&&<>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"4px 0 16px"}}>
+            <div style={{background:T.white,border:`2px solid ${T.teal20}`,borderRadius:20,padding:20,marginBottom:14,boxShadow:"0 4px 20px rgba(13,148,136,0.10)"}}>
+              <div ref={qrRef} style={{width:200,height:200,display:"flex",alignItems:"center",justifyContent:"center",color:T.g300,fontSize:13}}>Generating...</div>
+            </div>
+            <div style={{fontSize:13,fontWeight:600,color:T.g700,marginBottom:4}}>{nm} — RoomSync Invite</div>
+            <div style={{fontSize:12,color:T.g400,textAlign:"center",lineHeight:1.5,marginBottom:16,maxWidth:260}}>Have your roommates point their camera at this code to join instantly.</div>
+            <div style={{width:"100%",background:T.teal10,border:`1px solid ${T.teal20}`,borderRadius:12,padding:"12px 16px"}}>
+              {[["1","Open your camera app"],["2","Point it at the QR code above"],["3","Tap the RoomSync link that appears"],["4","Enter name + 4-digit PIN — done"]].map(([n,t])=>(
+                <div key={n} style={{display:"flex",alignItems:"center",gap:10,marginBottom:n==="4"?0:8}}>
+                  <div style={{width:22,height:22,borderRadius:"50%",background:T.teal,color:T.white,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n}</div>
+                  <div style={{fontSize:13,color:T.g700}}>{t}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>}
+      </div>
+      <div style={{padding:"0 24px"}}><button onClick={()=>setStep(3)} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700}}>Next — Track who's joined</button></div>
+    </div>
+  );
+
+  return (
+    <div style={{padding:"28px 24px 32px"}}>
+      <div style={{fontSize:11,fontWeight:700,color:T.teal,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Step 3 of 3</div>
+      <div style={{fontSize:22,fontWeight:800,color:T.g900,marginBottom:6}}>Waiting for roommates</div>
+      <div style={{fontSize:13,color:T.g400,marginBottom:20}}>Tap "Simulate join" to demo the onboarding experience.</div>
+      <Card style={{padding:14,marginBottom:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontSize:13,fontWeight:600,color:T.g700}}>Members joined</span><span style={{fontSize:13,fontWeight:700,color:T.teal}}>{joined.length}/{cnt}</span></div>
+        <Bar pct={(joined.length/cnt)*100}/>
+      </Card>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {demoMembers.map(m=>{const isIn=joined.includes(m.id);return(
+          <div key={m.id} style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",background:isIn?T.teal10:T.white,border:`1.5px solid ${isIn?T.teal20:T.g200}`,borderRadius:14,transition:"all 0.3s"}}>
+            <Av m={m} size={40}/>
+            <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,color:T.g800}}>{m.name}</div><div style={{fontSize:12,color:isIn?T.teal:T.g400,marginTop:1}}>{isIn?"Joined — under 2 min":"Waiting for invite..."}</div></div>
+            {!isIn&&m.id!==1?<button onClick={()=>setJoined(j=>[...j,m.id])} style={{background:T.teal,border:"none",borderRadius:8,padding:"7px 14px",color:T.white,fontSize:12,fontWeight:600}}>Simulate join</button>:isIn?<div style={{color:T.teal}}>{Icon.check}</div>:null}
+          </div>
+        );})}
+      </div>
+      {done&&<button onClick={()=>go({name:initiatorName.trim()||"Leticia", cnt, members:demoMembers, household:nm, city:ct})} style={{marginTop:20,width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"15px",color:T.white,fontSize:15,fontWeight:700}}>All joined — Go to Dashboard</button>}
+    </div>
+  );
+}
+
+// ── HOME ──────────────────────────────────────────────────────────────────────
+function Home({go,currentUser,members}) {
+  const MEMBERS = members || MEMBERS_DEFAULT;
+  const health=78;
+  const done=7,total=10,late=1;
+  const nudges=[
+    {icon:Icon.chores,color:T.teal,bg:T.teal10,title:"1 chore remaining today",sub:"Take out recycling — due today",to:"chores"},
+    {icon:Icon.warn,color:T.red,bg:T.red10,title:"Sam has 3 overdue chores",sub:"Clean toilet, Take out trash, Sweep entryway",to:"chores",urg:true},
+    {icon:Icon.amenities,color:T.blue,bg:T.blue10,title:"Laundry slot in 30 minutes",sub:"Your 8am booking — now 7:31am",to:"amenities"},
+    {icon:Icon.agreement,color:T.amber,bg:T.amber10,title:"1 agreement item to revisit",sub:"Cleanliness standards — tap to resolve",to:"agreement"},
+  ];
+
+  return <div style={{background:T.g50,minHeight:"100vh",paddingBottom:80}}>
+    <div style={{background:T.white,padding:"20px 20px 16px",borderBottom:`1px solid ${T.g100}`}}>
+      <div style={{fontSize:13,color:T.g400,marginBottom:2}}>Good morning,</div>
+      <div style={{fontSize:24,fontWeight:800,color:T.g900,letterSpacing:-0.5}}>{currentUser.name}</div>
+      <div style={{fontSize:12,color:T.g400,marginTop:3}}>Sunset Ave · Vancouver · {MEMBERS.length} member{MEMBERS.length!==1?"s":""}</div>
+    </div>
+    <div style={{padding:"14px 16px 0"}}>
+      <Card style={{padding:"16px 20px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+          <div>
+            <div style={{fontSize:12,fontWeight:600,color:T.g400,marginBottom:4}}>Household Health</div>
+            <div style={{fontSize:32,fontWeight:800,color:health>70?T.teal:T.amber,letterSpacing:-1,marginBottom:6}}>{health}%</div>
+            <Pill label={health>70?"Good standing":"Needs attention"} color={health>70?T.teal:T.amber}/>
+          </div>
+          <Ring pct={health} size={78} sw={6} color={health>70?T.teal:T.amber}/>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          {[{l:"Agreement",v:"Signed",c:T.teal,to:"agreement"},{l:"Chores",v:`${done}/${total}`,c:late>0?T.red:T.teal,to:"chores"},{l:"Bookings",v:"2 today",c:T.blue,to:"amenities"}].map(m=>(
+            <button key={m.l} onClick={()=>go(m.to)} style={{flex:1,background:T.g50,border:`1px solid ${T.g200}`,borderRadius:10,padding:"9px 6px",textAlign:"center"}}>
+              <div style={{fontSize:15,fontWeight:800,color:m.c}}>{m.v}</div>
+              <div style={{fontSize:10,color:T.g400,marginTop:2,fontWeight:500}}>{m.l}</div>
+            </button>
+          ))}
+        </div>
+      </Card>
+    </div>
+    <Sec label="Household"/>
+    <div style={{padding:"0 16px",display:"flex",gap:10}}>
+      {MEMBERS.map(m=><div key={m.id} style={{flex:1,background:T.white,border:`1px solid ${T.g200}`,borderRadius:14,padding:"12px 8px",textAlign:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+        <Av m={m} size={40}/>
+        <div style={{fontSize:12,fontWeight:600,color:T.g700,marginTop:8}}>{m.short}</div>
+        <div style={{fontSize:10,color:T.g400,marginTop:1}}>{m.role}</div>
+      </div>)}
+    </div>
+    <Sec label="Today's nudges"/>
+    <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:8}}>
+      {nudges.map((n,i)=>(
+        <button key={i} onClick={()=>go(n.to)} style={{display:"flex",alignItems:"center",gap:12,background:T.white,border:`1px solid ${n.urg?T.red+"44":T.g200}`,borderLeft:`3px solid ${n.color}`,borderRadius:12,padding:"12px 14px",textAlign:"left",boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+          <div style={{width:32,height:32,borderRadius:9,background:n.bg,display:"flex",alignItems:"center",justifyContent:"center",color:n.color,flexShrink:0}}>{n.icon}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:600,color:n.urg?T.red:T.g800}}>{n.title}</div>
+            <div style={{fontSize:11,color:T.g400,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.sub}</div>
+          </div>
+          <span style={{color:T.g300,flexShrink:0}}>{Icon.arrowR}</span>
+        </button>
+      ))}
+    </div>
+  </div>;
+}
+
+// ── AGREEMENT ─────────────────────────────────────────────────────────────────
+// Each topic has rich options. Each member answers independently.
+// After all members answer a topic, answers are compared.
+// If all match → auto-agreed. If conflict → must resolve before proceeding.
+// Status: "pending" | "answered" | "conflict" | "agreed"
+
+// allowCustomTime: true → user can pick a custom time after selecting any option
+// multiSelect: true   → user picks multiple options (all must apply)
+const AGREEMENT_TOPICS_DEF = [
+  {
+    id: "quiet", label: "Quiet Hours", icon: "moon",
+    question: "When should the household observe quiet hours?",
+    sub: "Quiet hours mean no loud music, TV, or disruptive noise. This affects everyone's sleep and work.",
+    allowCustomTime: true,
+    options: [
+      "9pm – 8am (strict)",
+      "10pm – 7am",
+      "10pm – 8am",
+      "10:30pm – 8am",
+      "11pm – 7am",
+      "11pm – 8am",
+      "Midnight – 8am",
+      "Midnight – 9am",
+      "No formal quiet hours",
+    ],
+  },
+  {
+    id: "clean", label: "Cleanliness Standard", icon: "clean",
+    question: "How often should shared areas be cleaned to a satisfactory standard?",
+    sub: "Covers kitchen surfaces, bathroom, living room. Not personal bedrooms.",
+    options: [
+      "Daily — surfaces wiped, dishes done before bed",
+      "Every 2 days",
+      "Every 2–3 days",
+      "Twice a week",
+      "Once a week",
+      "When it visibly needs it",
+      "No formal standard",
+    ],
+  },
+  {
+    id: "dishes", label: "Dishes Rule", icon: "dish",
+    question: "How long can dishes sit in the sink before they must be washed?",
+    sub: "This is the #1 source of roommate conflict. Setting a clear rule prevents the slow build-up of resentment.",
+    options: [
+      "Immediately after use",
+      "Within the same day",
+      "Before going to bed",
+      "Before the next meal",
+      "Within 24 hours",
+      "Within 48 hours",
+      "No rule",
+    ],
+  },
+  {
+    id: "guests", label: "Overnight Guest Policy", icon: "guest",
+    question: "How much notice is required before an overnight guest stays?",
+    sub: "Covers partners, friends, family. Protects everyone's comfort and privacy at home.",
+    allowCustomTime: true,
+    options: [
+      "12 hours notice required",
+      "24 hours notice required",
+      "48 hours notice required",
+      "72 hours notice required",
+      "1 week for stays longer than 2 nights",
+      "Always ask, no minimum notice",
+      "No approval needed — just let us know",
+      "No rule",
+    ],
+  },
+  {
+    id: "guestmax", label: "Maximum Guest Stay", icon: "guest",
+    question: "What is the maximum number of consecutive nights a guest can stay per month?",
+    sub: "A guest who effectively moves in affects everyone — groceries, bathroom time, shared spaces.",
+    options: [
+      "2 nights per visit, max 4/month",
+      "3 nights per visit, max 6/month",
+      "Up to 5 consecutive nights",
+      "Up to 7 consecutive nights",
+      "Up to 2 weeks with household agreement",
+      "No limit if everyone agrees case by case",
+      "No rule",
+    ],
+  },
+  {
+    id: "noise", label: "Music & TV Volume", icon: "noise",
+    question: "What is the acceptable volume policy for music, TV, and calls in common areas?",
+    sub: "Especially relevant for thin walls and open-plan spaces.",
+    allowCustomTime: true,
+    options: [
+      "Headphones only in common areas after 9pm",
+      "Headphones only in common areas after 10pm",
+      "Headphones only after 11pm",
+      "Reasonable volume at all times — ask if someone is bothered",
+      "No speakers in common areas at any time — always headphones",
+      "No rule",
+    ],
+  },
+  {
+    id: "bills", label: "Bill Payment Deadline", icon: "bill",
+    question: "When must each person transfer their share of shared bills by?",
+    sub: "Covers utilities, internet, subscriptions. The person who paid upfront shouldn't have to chase.",
+    allowCustomTime: true,
+    options: [
+      "Within 24 hours of being asked",
+      "Within 48 hours of being asked",
+      "Within 3 days of being asked",
+      "Within 5 days of being asked",
+      "By the 1st of each month",
+      "By the 5th of each month",
+      "By the 15th of each month",
+      "Same day the bill is due",
+    ],
+  },
+  {
+    id: "kitchen_food", label: "Fridge & Food Rules", icon: "kitchen",
+    question: "What food and fridge rules should the household follow?",
+    sub: "These are separate issues — select all that apply to your household.",
+    multiSelect: true,
+    options: [
+      "Label all personal food in the fridge",
+      "Label all personal food in the cupboards",
+      "Assign each person a dedicated fridge shelf",
+      "Assign each person a dedicated cupboard section",
+      "No eating or using someone else's food without asking",
+      "Basic staples shared (oil, salt, butter, condiments)",
+      "Groceries fully separate — each person buys their own",
+      "Weekly shared grocery shop — split evenly",
+      "Clear out expired food from fridge every Sunday",
+      "No strong-smelling food in shared areas",
+    ],
+  },
+  {
+    id: "kitchen_clean", label: "Kitchen Cleanliness", icon: "kitchen",
+    question: "What are the kitchen cleaning and cooking rules?",
+    sub: "Covers stove, counters, appliances, and general tidiness after cooking.",
+    multiSelect: true,
+    options: [
+      "Wipe the stove after every use",
+      "Wipe counters after every cooking session",
+      "Clean the microwave after any splatter",
+      "Return shared appliances (kettle, toaster) to their spot after use",
+      "Take out kitchen bin when full — don't overfill it",
+      "No cooking after midnight",
+      "No frying fish or strong-smelling food without ventilation",
+      "Clean up within the same day of cooking",
+    ],
+  },
+  {
+    id: "thermostat", label: "Thermostat / Temperature", icon: "moon",
+    question: "How should the household manage heating and cooling?",
+    sub: "Temperature disagreements are surprisingly common and affect energy bills too.",
+    options: [
+      "Set at 20°C (68°F) in winter, 23°C (73°F) in summer",
+      "Set at 21°C (70°F) year-round",
+      "Set at 22°C (72°F) in winter, 24°C (75°F) in summer",
+      "Whoever's home controls it — be considerate",
+      "Discuss and agree when needed",
+      "No rule — personal preference",
+    ],
+  },
+  {
+    id: "chores_miss", label: "Missed Chores Policy", icon: "clean",
+    question: "What happens if someone misses their assigned chore for the week?",
+    sub: "This sets expectations upfront so addressing it doesn't become personal.",
+    options: [
+      "Complete it within 24 hours of the reminder",
+      "Swap with someone else that week — your responsibility to arrange",
+      "Three strikes: discuss if it becomes a pattern",
+      "One gentle reminder, then a house meeting if ongoing",
+      "No formal policy — handle case by case",
+    ],
+  },
+];
+
+function Agreement({members}) {
+  const MEMBERS = members || MEMBERS_DEFAULT;
+  // answers:     { topicId: { memberId: string (single) | string[] (multi) } }
+  // agreeMap:    { topicId: string | string[] }  — final agreed value
+  // customTimes: { topicId: string }  — optional custom time string per topic
+  // customTopics: [{ id, label, question }]  — user-added custom topics
+  const [answers,      setAnswers]      = useState({});
+  const [agreeMap,     setAgreeMap]     = useState({});
+  const [customTimes,  setCustomTimes]  = useState({});
+  const [customTopics, setCustomTopics] = useState([]);
+  const [phase,        setPhase]        = useState("overview");
+  const [wizardIdx,    setWizardIdx]    = useState(0);
+  const [conflictId,   setConflictId]   = useState(null);
+  const [exported,     setExported]     = useState(false);
+  const [showAddTopic, setShowAddTopic] = useState(false);
+  const [newTopicLabel,setNewTopicLabel]= useState("");
+  const [newTopicQ,    setNewTopicQ]    = useState("");
+  const [customTimeInput, setCustomTimeInput] = useState("");
+  const [showCustomTimeFor, setShowCustomTimeFor] = useState(null); // topicId
+
+  const ME = MEMBERS[0];
+
+  // All topics = built-in + custom
+  const allTopics = [
+    ...AGREEMENT_TOPICS_DEF,
+    ...customTopics.map(t => ({...t, icon:"bill", options:[], multiSelect:false, isCustom:true})),
+  ];
+
+  // Compute status of each topic
+  function topicStatus(id) {
+    const topic = allTopics.find(t=>t.id===id);
+    const ans = answers[id] || {};
+    // Custom topics with no options are answered when agreeMap has a value
+    if (topic?.isCustom) return agreeMap[id] ? "agreed" : "pending";
+    const answeredMembers = Object.keys(ans).length;
+    if (answeredMembers < MEMBERS.length) return "pending";
+    // Multi-select: compare as sorted JSON strings
+    const vals = Object.values(ans).map(v => Array.isArray(v) ? JSON.stringify([...v].sort()) : v);
+    if (vals.every(v => v === vals[0])) return "agreed";
+    return "conflict";
+  }
+
+  const statuses = allTopics.reduce((acc, t) => ({...acc, [t.id]: topicStatus(t.id)}), {});
+  const allResolved = allTopics.every(t => agreeMap[t.id]);
+  const pendingCount = allTopics.filter(t => statuses[t.id]==="pending").length;
+  const conflictCount = allTopics.filter(t => statuses[t.id]==="conflict" && !agreeMap[t.id]).length;
+  const resolvedCount = allTopics.filter(t => agreeMap[t.id]).length;
+  const progress = allTopics.length ? Math.round((resolvedCount / allTopics.length)*100) : 0;
+
+  // ── WIZARD: member answers one topic ──────────────────────────────────────
+  if (phase === "wizard") {
+    const topic = allTopics[wizardIdx];
+    if (!topic) { setPhase("review"); return null; }
+    const totalTopics = allTopics.length;
+    const myAnswer = (answers[topic.id]||{})[ME.id]; // string or string[]
+
+    // Multi-select toggle
+    function toggleMulti(opt) {
+      const prev = Array.isArray(myAnswer) ? myAnswer : [];
+      const next = prev.includes(opt) ? prev.filter(x=>x!==opt) : [...prev, opt];
+      setAnswers(a=>({...a,[topic.id]:{...(a[topic.id]||{}),[ME.id]:next}}));
+    }
+
+    // Confirm multi-select and proceed
+    function confirmMulti() {
+      const my = Array.isArray(myAnswer) ? myAnswer : [];
+      if (my.length === 0) return;
+      // Demo: other members pick same selection (no conflict for multi)
+      const fullAnswers = {...answers, [topic.id]:{1:my,2:my,3:my}};
+      setAnswers(fullAnswers);
+      setAgreeMap(a=>({...a,[topic.id]:my}));
+      const nextIdx = allTopics.findIndex((t,i)=>i>wizardIdx&&!agreeMap[t.id]);
+      if(nextIdx===-1) setPhase("review"); else setWizardIdx(nextIdx);
+    }
+
+    // Single-select with optional custom time
+    function selectOption(opt) {
+      if (topic.allowCustomTime) {
+        setShowCustomTimeFor(topic.id);
+        setCustomTimeInput("");
+        // Temporarily set answer and proceed after time choice
+        const fullAnswers = {...answers};
+        const demoMap = {
+          quiet:      {1:opt,2:"10pm – 8am",3:"11pm – 8am"},
+          dishes:     {1:opt,2:"Within 24 hours",3:"Within 48 hours"},
+          guests:     {1:opt,2:"24 hours notice required",3:opt},
+          guestmax:   {1:opt,2:opt,3:opt},
+          noise:      {1:opt,2:opt,3:"No rule"},
+          bills:      {1:opt,2:"Within 48 hours of being asked",3:opt},
+          thermostat: {1:opt,2:opt,3:"Discuss and agree when needed"},
+          chores_miss:{1:opt,2:opt,3:opt},
+          clean:      {1:opt,2:opt,3:"Once a week"},
+        };
+        fullAnswers[topic.id] = demoMap[topic.id]||{1:opt,2:opt,3:opt};
+        fullAnswers[topic.id][ME.id] = opt;
+        setAnswers(fullAnswers);
+        return; // Wait for custom time modal
+      }
+      proceedSingle(opt);
+    }
+
+    function proceedSingle(opt) {
+      const demoMap = {
+        quiet:      {1:opt,2:"10pm – 8am",3:"11pm – 8am"},
+        dishes:     {1:opt,2:"Within 24 hours",3:"Within 48 hours"},
+        guests:     {1:opt,2:"24 hours notice required",3:opt},
+        guestmax:   {1:opt,2:opt,3:opt},
+        noise:      {1:opt,2:opt,3:"No rule"},
+        bills:      {1:opt,2:"Within 48 hours of being asked",3:opt},
+        thermostat: {1:opt,2:opt,3:"Discuss and agree when needed"},
+        chores_miss:{1:opt,2:opt,3:opt},
+        clean:      {1:opt,2:opt,3:"Once a week"},
+      };
+      const fullAnswers = {...answers};
+      fullAnswers[topic.id] = demoMap[topic.id]||{1:opt,2:opt,3:opt};
+      fullAnswers[topic.id][ME.id] = opt;
+      setAnswers(fullAnswers);
+      const vals = Object.values(fullAnswers[topic.id]);
+      const isConflict = !vals.every(v=>v===vals[0]);
+      if(isConflict){setConflictId(topic.id);setPhase("conflict");}
+      else{
+        setAgreeMap(a=>({...a,[topic.id]:fullAnswers[topic.id][ME.id]}));
+        const nextIdx=allTopics.findIndex((t,i)=>i>wizardIdx&&!agreeMap[t.id]);
+        if(nextIdx===-1)setPhase("review");else setWizardIdx(nextIdx);
+      }
+    }
+
+    // Custom topic (no options): free-text input
+    if (topic.isCustom) {
+      const customVal = agreeMap[topic.id] || "";
+      return (
+        <div style={{background:T.g50,minHeight:"100vh",paddingBottom:80}}>
+          <TopBar title={`${wizardIdx+1} of ${totalTopics}`} sub={topic.label}
+            back={()=>{if(wizardIdx>0)setWizardIdx(i=>i-1);else setPhase("overview");}}
+            right={<button onClick={()=>setPhase("overview")} style={{background:"none",border:"none",color:T.g400,fontSize:13,fontWeight:500}}>Save & Exit</button>}/>
+          <div style={{padding:"10px 16px 0"}}><Bar pct={(wizardIdx/totalTopics)*100} color={T.teal} h={4}/></div>
+          <div style={{padding:"16px 16px 0"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,padding:"10px 14px",background:T.teal10,border:`1px solid ${T.teal20}`,borderRadius:12}}>
+              <Av m={ME} size={28}/><div><div style={{fontSize:12,fontWeight:700,color:T.tealDk}}>Answering as {ME.name}</div><div style={{fontSize:11,color:T.g500}}>Custom topic</div></div>
+            </div>
+            <div style={{fontSize:18,fontWeight:800,color:T.g900,marginBottom:6,lineHeight:1.35}}>{topic.question||topic.label}</div>
+            <div style={{fontSize:13,color:T.g500,marginBottom:20}}>Type the agreed rule or decision for this topic.</div>
+            <textarea
+              placeholder="e.g. All household members agree to..."
+              defaultValue={customVal}
+              id="custom-topic-input"
+              style={{...inp,height:100,resize:"none",fontFamily:"inherit",lineHeight:1.6,marginBottom:16}}
+            />
+            <button onClick={()=>{
+              const val=document.getElementById("custom-topic-input").value.trim();
+              if(!val)return;
+              setAgreeMap(a=>({...a,[topic.id]:val}));
+              const nextIdx=allTopics.findIndex((t,i)=>i>wizardIdx&&!agreeMap[t.id]);
+              if(nextIdx===-1)setPhase("review");else setWizardIdx(nextIdx);
+            }} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700}}>Save & Continue</button>
+          </div>
+        </div>
+      );
+    }
+
+    // Custom time overlay
+    if (showCustomTimeFor === topic.id) {
+      const currentOpt = (answers[topic.id]||{})[ME.id];
+      return (
+        <div style={{background:T.g50,minHeight:"100vh",paddingBottom:80}}>
+          <TopBar title="Set Custom Time" sub={topic.label} back={()=>setShowCustomTimeFor(null)}/>
+          <div style={{padding:"16px 16px 0"}}>
+            <div style={{background:T.teal10,border:`1px solid ${T.teal20}`,borderRadius:12,padding:"12px 16px",marginBottom:20}}>
+              <div style={{fontSize:12,color:T.g500,marginBottom:2}}>Selected option</div>
+              <div style={{fontSize:14,fontWeight:700,color:T.tealDk}}>{currentOpt}</div>
+            </div>
+            <div style={{fontSize:14,fontWeight:700,color:T.g800,marginBottom:6}}>Add a custom time (optional)</div>
+            <div style={{fontSize:13,color:T.g500,marginBottom:14,lineHeight:1.5}}>
+              If none of the preset times work, specify an exact time or period. Leave blank to use the selected option as-is.
+            </div>
+            <input
+              value={customTimeInput}
+              onChange={e=>setCustomTimeInput(e.target.value)}
+              placeholder="e.g. 10:30pm – 7:30am, or Within 6 hours"
+              style={{...inp,marginBottom:16,fontSize:15}}
+            />
+            <button onClick={()=>{
+              const finalVal = customTimeInput.trim() ? customTimeInput.trim() : currentOpt;
+              if(customTimeInput.trim()) setCustomTimes(ct=>({...ct,[topic.id]:finalVal}));
+              setShowCustomTimeFor(null);
+              proceedSingle(finalVal);
+            }} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700,marginBottom:10}}>
+              {customTimeInput.trim() ? "Use custom time & continue" : "Use selected option & continue"}
+            </button>
+            <button onClick={()=>{setShowCustomTimeFor(null); proceedSingle(currentOpt);}} style={{width:"100%",background:T.white,border:`1.5px solid ${T.g200}`,borderRadius:12,padding:"13px",color:T.g500,fontSize:14}}>
+              Skip — use selected option
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const myMulti = Array.isArray(myAnswer) ? myAnswer : [];
+
+    return (
+      <div style={{background:T.g50,minHeight:"100vh",paddingBottom:topic.multiSelect?120:80}}>
+        <TopBar
+          title={`${wizardIdx+1} of ${totalTopics}`}
+          sub={topic.label}
+          back={()=>{ if(wizardIdx>0) setWizardIdx(i=>i-1); else setPhase("overview"); }}
+          right={<button onClick={()=>setPhase("overview")} style={{background:"none",border:"none",color:T.g400,fontSize:13,fontWeight:500}}>Save & Exit</button>}
+        />
+        <div style={{padding:"10px 16px 0"}}>
+          <Bar pct={(wizardIdx/totalTopics)*100} color={T.teal} h={4}/>
+        </div>
+        <div style={{padding:"16px 16px 0"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,padding:"10px 14px",background:T.teal10,border:`1px solid ${T.teal20}`,borderRadius:12}}>
+            <Av m={ME} size={28}/>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:T.tealDk}}>Answering as {ME.name}</div>
+              <div style={{fontSize:11,color:T.g500}}>{topic.multiSelect?"Select all that apply":"Each member answers on their own device"}</div>
+            </div>
+          </div>
+          <div style={{fontSize:18,fontWeight:800,color:T.g900,marginBottom:6,lineHeight:1.35}}>{topic.question}</div>
+          <div style={{fontSize:13,color:T.g500,marginBottom:topic.allowCustomTime?6:20,lineHeight:1.6}}>{topic.sub}</div>
+          {topic.allowCustomTime&&(
+            <div style={{fontSize:12,color:T.teal,fontWeight:600,marginBottom:16,display:"flex",alignItems:"center",gap:6}}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              You can set a custom time after selecting any option
+            </div>
+          )}
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:topic.multiSelect?80:0}}>
+            {topic.options.map(opt => {
+              const selected = topic.multiSelect ? myMulti.includes(opt) : myAnswer === opt;
+              return (
+                <button key={opt} onClick={()=>topic.multiSelect?toggleMulti(opt):selectOption(opt)} style={{
+                  background: selected ? T.teal : T.white,
+                  border: `1.5px solid ${selected ? T.teal : T.g200}`,
+                  borderRadius: 12, padding: "13px 16px",
+                  textAlign: "left", display: "flex", alignItems: "center", gap: 12,
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                }}>
+                  <div style={{
+                    width: 20, height: 20, borderRadius: topic.multiSelect?"4px":"50%", flexShrink: 0,
+                    background: selected ? T.white : T.white,
+                    border: `2px solid ${selected ? T.white : T.g300}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    {selected && (topic.multiSelect
+                      ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={T.teal} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      : <div style={{width:10,height:10,borderRadius:"50%",background:T.teal}}/>
+                    )}
+                  </div>
+                  <span style={{fontSize:14,fontWeight:selected?700:400,color:selected?T.white:T.g700,flex:1}}>{opt}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        {topic.multiSelect&&(
+          <div style={{position:"fixed",bottom:56,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,padding:"12px 16px",background:T.white,borderTop:`1px solid ${T.g100}`,zIndex:50}}>
+            <div style={{fontSize:12,color:T.g400,marginBottom:8}}>{myMulti.length} option{myMulti.length!==1?"s":""} selected</div>
+            <button onClick={confirmMulti} disabled={myMulti.length===0} style={{width:"100%",background:myMulti.length>0?T.teal:T.g300,border:"none",borderRadius:12,padding:"13px",color:T.white,fontSize:15,fontWeight:700}}>
+              Confirm & Continue
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── CONFLICT RESOLUTION ───────────────────────────────────────────────────
+  if (phase === "conflict" && conflictId) {
+    const topic = allTopics.find(t=>t.id===conflictId);
+    const topicAnswers = answers[conflictId]||{};
+    const vals = Object.values(topicAnswers);
+    const freq = vals.reduce((acc,v)=>({...acc,[v]:(acc[v]||0)+1}),{});
+    const majorityVal = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0]?.[0];
+    const allOpts = topic.options||[];
+    const uniqueVals = [...new Set(vals)];
+    const indices = uniqueVals.map(v=>allOpts.indexOf(v)).filter(i=>i>=0);
+    const midIdx = indices.length>=2 ? Math.round((Math.min(...indices)+Math.max(...indices))/2) : -1;
+    const compromiseVal = midIdx>=0 ? allOpts[midIdx] : majorityVal;
+
+    const resOptions = [
+      { label:"Compromise", sub:"Pick the middle-ground option", val:compromiseVal, star:true },
+      { label:"Majority rules", sub:"Go with the most popular answer", val:majorityVal, star:false },
+      { label:"Most lenient", sub:"Use the least restrictive answer", val:allOpts.length?allOpts[Math.max(...indices)]:majorityVal, star:false },
+      { label:"Most strict", sub:"Use the most restrictive answer", val:allOpts.length?allOpts[Math.min(...indices)]:majorityVal, star:false },
+      { label:"Revisit in 30 days", sub:"Defer this decision — flag for later", val:"Revisit in 30 days", star:false },
+    ].filter((o,i,arr)=>arr.findIndex(x=>x.val===o.val)===i);
+
+    function resolveConflict(val) {
+      setAgreeMap(a=>({...a,[conflictId]:val}));
+      setConflictId(null);
+      const nextIdx = allTopics.findIndex((t,i)=>i>wizardIdx && !agreeMap[t.id] && t.id!==conflictId);
+      if (nextIdx===-1) { setPhase("review"); }
+      else { setWizardIdx(nextIdx); setPhase("wizard"); }
+    }
+
+    return (
+      <div style={{background:T.g50,minHeight:"100vh",paddingBottom:80}}>
+        <TopBar title="Conflict Detected" sub={topic.label} back={()=>{setPhase("wizard");}}/>
+        <div style={{padding:"14px 16px"}}>
+
+          {/* Conflict banner */}
+          <div style={{background:T.amber10,border:`1.5px solid ${T.amber}44`,borderRadius:14,padding:16,marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:700,color:T.amber,marginBottom:12}}>
+              {Icon.warn} Members gave different answers
+            </div>
+            {MEMBERS.map(m=>{
+              const ans = topicAnswers[m.id];
+              if(!ans) return null;
+              const isUnique = vals.filter(v=>v===ans).length===1;
+              return (
+                <div key={m.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,padding:"8px 10px",background:T.white,borderRadius:10,border:`1px solid ${T.g200}`}}>
+                  <Av m={m} size={28}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,fontWeight:600,color:T.g700}}>{m.name}</div>
+                    <div style={{fontSize:12,color:T.g500,marginTop:1}}>{ans}</div>
+                  </div>
+                  {isUnique&&<Pill label="Disagrees" color={T.red}/>}
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{fontSize:13,fontWeight:700,color:T.g700,marginBottom:4}}>Resolve this disagreement</div>
+          <div style={{fontSize:12,color:T.g400,marginBottom:14,lineHeight:1.5}}>All members must agree on one answer before the agreement is finalised. Choose how to proceed.</div>
+
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {resOptions.map(opt=>(
+              <button key={opt.val} onClick={()=>resolveConflict(opt.val)} style={{
+                background:opt.star?T.teal10:T.white,
+                border:`1.5px solid ${opt.star?T.teal:T.g200}`,
+                borderRadius:14,padding:"13px 16px",textAlign:"left",
+              }}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                  <div style={{fontSize:14,fontWeight:700,color:opt.star?T.teal:T.g800}}>{opt.label}</div>
+                  {opt.star&&<Pill label="Recommended" color={T.teal}/>}
+                </div>
+                <div style={{fontSize:12,color:T.g400,marginBottom:4}}>{opt.sub}</div>
+                <div style={{fontSize:13,fontWeight:600,color:opt.star?T.teal:T.g600,padding:"6px 10px",background:opt.star?T.teal20:T.g50,borderRadius:8,display:"inline-block"}}>"{opt.val}"</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── REVIEW / COMPLETE ─────────────────────────────────────────────────────
+  if (phase === "review" || phase === "complete") {
+    const unresolvedConflicts = allTopics.filter(t => statuses[t.id]==="conflict" && !agreeMap[t.id]);
+    const pendingTopics = allTopics.filter(t => statuses[t.id]==="pending" && !agreeMap[t.id]);
+    const canSign = unresolvedConflicts.length===0 && pendingTopics.length===0;
+
+    // Helper: format agreed value (could be array for multiSelect)
+    function fmtVal(v) {
+      if (!v) return "Not agreed";
+      if (Array.isArray(v)) return v.join("; ");
+      return v;
+    }
+
+    // Build the PDF/print HTML — open in new tab then print
+    function openPDF() {
+      const date = new Date().toLocaleDateString("en-CA",{year:"numeric",month:"long",day:"numeric"});
+      const rows = allTopics.map(t=>{
+        const val = fmtVal(agreeMap[t.id]);
+        const isCustom = t.isCustom ? " <em style='font-size:10px;color:#94A3B8'>(custom)</em>" : "";
+        const ct = customTimes[t.id] ? ` <span style='color:#0D9488;font-size:11px'>(custom time: ${customTimes[t.id]})</span>` : "";
+        return `<tr>
+          <td style="padding:10px 14px;border-bottom:1px solid #F1F5F9;font-weight:600;color:#334155;width:35%">${t.label}${isCustom}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #F1F5F9;color:#475569">${val}${ct}</td>
+        </tr>`;
+      }).join("");
+      const sigs = MEMBERS.map(m=>`
+        <div style="flex:1;border-top:2px solid #CBD5E1;padding-top:10px">
+          <div style="font-size:14px;font-weight:600;color:#334155">${m.name}</div>
+          <div style="font-size:11px;color:#94A3B8;margin-top:4px">${m.role}</div>
+          <div style="font-size:11px;color:#0D9488;margin-top:6px">Co-signed digitally via RoomSync</div>
+        </div>`).join("");
+      const html = `<!DOCTYPE html><html><head>
+        <title>Sunset Ave — Household Agreement</title>
+        <meta charset="UTF-8">
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+          *{box-sizing:border-box;margin:0;padding:0}
+          body{font-family:Inter,sans-serif;color:#1E293B;background:#fff;padding:0}
+          .page{max-width:720px;margin:0 auto;padding:48px 40px}
+          .header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:32px;padding-bottom:24px;border-bottom:2px solid #0D9488}
+          .logo{font-size:22px;font-weight:800;color:#0D9488;letter-spacing:-0.5px}
+          .meta{font-size:12px;color:#94A3B8;text-align:right;line-height:1.7}
+          h1{font-size:28px;font-weight:800;color:#0F172A;margin-bottom:4px;letter-spacing:-0.5px}
+          .subtitle{font-size:14px;color:#64748B;margin-bottom:32px}
+          table{width:100%;border-collapse:collapse;margin-bottom:40px;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden}
+          thead tr{background:#F0FDFA}
+          th{padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#0D9488;font-weight:700;text-align:left}
+          tr:last-child td{border-bottom:none}
+          .sigs{display:flex;gap:20px;margin-top:40px;padding-top:32px;border-top:1px solid #E2E8F0}
+          .footer{margin-top:32px;font-size:11px;color:#94A3B8;text-align:center;border-top:1px solid #F1F5F9;padding-top:16px}
+          @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+        </style>
+      </head><body>
+        <div class="page">
+          <div class="header">
+            <div>
+              <div class="logo">RoomSync</div>
+              <div style="font-size:12px;color:#94A3B8;margin-top:2px">Conflict-free shared living — by design.</div>
+            </div>
+            <div class="meta">
+              <div><strong>Sunset Ave</strong> · Vancouver, BC</div>
+              <div>${MEMBERS.map(m=>m.short).join(", ")}</div>
+              <div>${date}</div>
+            </div>
+          </div>
+          <h1>Household Agreement</h1>
+          <div class="subtitle">This document records the agreed rules and expectations for Sunset Ave. All ${MEMBERS.length} members have co-signed.</div>
+          <table>
+            <thead><tr><th>Topic</th><th>Agreed Term</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="sigs">${sigs}</div>
+          <div class="footer">
+            Generated by RoomSync on ${date} &nbsp;·&nbsp;
+            This is a shared household agreement between roommates. It is not a legally binding contract.
+          </div>
+        </div>
+        <script>window.onload=function(){window.print();}<\/script>
+      </body></html>`;
+      const w = window.open("","_blank");
+      if(w){ w.document.write(html); w.document.close(); }
+      setExported(true);
+    }
+
+    return (
+      <div style={{background:T.g50,minHeight:"100vh",paddingBottom:80}}>
+        <TopBar title={canSign?"Agreement Complete":"Review Agreement"} sub={canSign?"Ready to export":"Finish resolving items"}
+          right={pendingTopics.length>0||unresolvedConflicts.length>0
+            ? <button onClick={()=>{
+                const idx=allTopics.findIndex(t=>statuses[t.id]==="pending"||(!agreeMap[t.id]&&statuses[t.id]==="conflict"));
+                setWizardIdx(idx>=0?idx:0);setPhase("wizard");
+              }} style={{background:T.teal,border:"none",borderRadius:20,padding:"7px 14px",color:T.white,fontSize:12,fontWeight:700}}>Continue</button>
+            : null}/>
+
+        <div style={{padding:"12px 16px"}}>
+          <Card style={{padding:16,marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <span style={{fontSize:14,fontWeight:700,color:T.g700}}>Progress</span>
+              <span style={{fontSize:14,fontWeight:800,color:T.teal}}>{resolvedCount}/{allTopics.length}</span>
+            </div>
+            <Bar pct={progress} color={T.teal} h={6}/>
+            <div style={{display:"flex",gap:10,marginTop:12}}>
+              {[{label:"Agreed",count:resolvedCount,color:T.teal},{label:"Conflicts",count:unresolvedConflicts.length,color:T.amber},{label:"Pending",count:pendingTopics.length,color:T.g300}].map(s=>(
+                <div key={s.label} style={{flex:1,textAlign:"center",padding:"8px 4px",background:T.g50,borderRadius:8}}>
+                  <div style={{fontSize:18,fontWeight:800,color:s.color}}>{s.count}</div>
+                  <div style={{fontSize:10,color:T.g400,marginTop:1}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {unresolvedConflicts.length>0&&<>
+            <div style={{fontSize:11,fontWeight:700,color:T.red,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Conflicts to resolve ({unresolvedConflicts.length})</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+              {unresolvedConflicts.map(t=>(
+                <Card key={t.id} style={{border:`1.5px solid ${T.amber}55`}}>
+                  <div style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{width:36,height:36,borderRadius:10,background:T.amber10,display:"flex",alignItems:"center",justifyContent:"center",color:T.amber,flexShrink:0}}>{Icon.warn}</div>
+                    <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:T.g800}}>{t.label}</div><div style={{fontSize:12,color:T.amber,marginTop:2}}>Members disagree — needs resolution</div></div>
+                    <button onClick={()=>{setConflictId(t.id);setPhase("conflict");}} style={{background:T.amber,border:"none",borderRadius:8,padding:"7px 13px",color:T.white,fontSize:12,fontWeight:700}}>Resolve</button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </>}
+
+          {pendingTopics.length>0&&<>
+            <div style={{fontSize:11,fontWeight:700,color:T.g400,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Not yet answered ({pendingTopics.length})</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+              {pendingTopics.map(t=>(
+                <Card key={t.id} style={{border:`1px solid ${T.g200}`}}>
+                  <div style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{width:36,height:36,borderRadius:10,background:T.g100,display:"flex",alignItems:"center",justifyContent:"center",color:T.g400,flexShrink:0}}><TopicIcon id={t.icon} size={18}/></div>
+                    <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T.g700}}>{t.label}</div><div style={{fontSize:12,color:T.g400,marginTop:1}}>Not yet answered</div></div>
+                    <button onClick={()=>{setWizardIdx(allTopics.indexOf(t));setPhase("wizard");}} style={{background:T.teal,border:"none",borderRadius:8,padding:"7px 13px",color:T.white,fontSize:12,fontWeight:700}}>Answer</button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </>}
+
+          {resolvedCount>0&&<>
+            <div style={{fontSize:11,fontWeight:700,color:T.g400,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Agreed ({resolvedCount})</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
+              {allTopics.filter(t=>agreeMap[t.id]).map(t=>{
+                const val = agreeMap[t.id];
+                const displayVal = Array.isArray(val) ? val : [val];
+                return (
+                  <Card key={t.id}>
+                    <div style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+                      <div style={{width:36,height:36,borderRadius:10,background:T.teal10,display:"flex",alignItems:"center",justifyContent:"center",color:T.teal,flexShrink:0}}><TopicIcon id={t.icon} size={18}/></div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:700,color:T.g800}}>{t.label}{t.isCustom&&<span style={{fontSize:10,color:T.purple,fontWeight:600,marginLeft:6,background:T.purple10,padding:"1px 6px",borderRadius:10}}>Custom</span>}</div>
+                        {displayVal.map((v,i)=><div key={i} style={{fontSize:12,color:T.teal,marginTop:2,fontWeight:500}}>{v}</div>)}
+                        {customTimes[t.id]&&<div style={{fontSize:11,color:T.g500,marginTop:2}}>Custom time: {customTimes[t.id]}</div>}
+                      </div>
+                      <span style={{color:T.mint}}>{Icon.check}</span>
+                    </div>
+                    <div style={{padding:"0 16px 10px",display:"flex",alignItems:"center",gap:6,borderTop:`1px solid ${T.g50}`}}>
+                      <span style={{fontSize:11,color:T.g400,marginRight:4}}>Co-signed by</span>
+                      {MEMBERS.map(m=><Av key={m.id} m={m} size={18}/>)}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </>}
+
+          {canSign&&<>
+            <div style={{background:T.teal10,border:`1px solid ${T.teal20}`,borderRadius:14,padding:16,marginBottom:16}}>
+              <div style={{fontSize:14,fontWeight:700,color:T.tealDk,marginBottom:4}}>All topics agreed — ready to export</div>
+              <div style={{fontSize:12,color:T.g500,lineHeight:1.6}}>Export or print a clean PDF copy for your records. Opens in a new tab — use your browser's print / save as PDF option.</div>
+            </div>
+            <button onClick={openPDF} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:10}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              Export as PDF
+            </button>
+            {exported&&<div style={{textAlign:"center",color:T.mint,fontSize:13,fontWeight:600,marginTop:8}}>Opened in new tab — use Print → Save as PDF</div>}
+          </>}
+        </div>
+      </div>
+    );
+  }
+
+  // ── OVERVIEW ──────────────────────────────────────────────────────────────
+  const hasStarted = Object.keys(answers).length > 0 || Object.keys(agreeMap).length > 0;
+
+  return (
+    <div style={{background:T.g50,minHeight:"100vh",paddingBottom:80}}>
+      <TopBar title="Agreement Builder" sub="Sunset Ave House Rules"/>
+      <div style={{padding:"12px 16px"}}>
+
+        {/* Progress card */}
+        <Card style={{padding:16,marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+            <span style={{fontSize:14,fontWeight:700,color:T.g700}}>{hasStarted?"Progress":"Not started"}</span>
+            <span style={{fontSize:14,fontWeight:800,color:T.teal}}>{resolvedCount}/{allTopics.length} topics</span>
+          </div>
+          <Bar pct={progress} color={T.teal} h={6}/>
+          {hasStarted&&(
+            <div style={{display:"flex",gap:10,marginTop:12}}>
+              {[{l:"Agreed",v:resolvedCount,color:T.teal},{l:"Conflict",v:conflictCount,color:T.amber},{l:"Pending",v:pendingCount,color:T.g300}].map(s=>(
+                <div key={s.l} style={{flex:1,textAlign:"center",padding:"7px 4px",background:T.g50,borderRadius:8}}>
+                  <div style={{fontSize:18,fontWeight:800,color:s.color}}>{s.v}</div>
+                  <div style={{fontSize:10,color:T.g400,marginTop:1}}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {allResolved&&(
+            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:12,padding:"10px 12px",background:T.teal10,borderRadius:10}}>
+              <span style={{color:T.teal}}>{Icon.check}</span>
+              <span style={{fontSize:12,fontWeight:700,color:T.teal}}>Signed by all 3 members · April 2026</span>
+            </div>
+          )}
+        </Card>
+
+        {/* CTA */}
+        {!allResolved&&(
+          <button onClick={()=>{
+            const firstConflict = allTopics.findIndex(t=>!agreeMap[t.id]&&statuses[t.id]==="conflict");
+            const firstPending  = allTopics.findIndex(t=>!agreeMap[t.id]&&statuses[t.id]!=="conflict");
+            if(firstConflict>=0&&firstPending===-1){setConflictId(allTopics[firstConflict].id);setPhase("conflict");}
+            else{setWizardIdx(firstPending>=0?firstPending:0);setPhase("wizard");}
+          }} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700,marginBottom:16,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+            {Icon.arrowR}
+            {hasStarted?(conflictCount>0?"Resolve conflicts":"Continue building"):"Start Agreement Builder"}
+          </button>
+        )}
+        {allResolved&&(
+          <button onClick={()=>setPhase("review")} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700,marginBottom:16,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+            {Icon.copy} View, Export or Print Agreement
+          </button>
+        )}
+
+        {/* Topic list */}
+        <div style={{fontSize:11,fontWeight:700,color:T.g400,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>All topics ({allTopics.length})</div>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+          {allTopics.map((t,i)=>{
+            const s = statuses[t.id];
+            const agreed = agreeMap[t.id];
+            const statusColor = agreed?T.teal:s==="conflict"?T.amber:T.g300;
+            const statusLabel = agreed?"Agreed":s==="conflict"?"Conflict":"Pending";
+            const displayVal = agreed ? (Array.isArray(agreed) ? agreed.slice(0,2).join("; ")+(agreed.length>2?` +${agreed.length-2} more`:"") : agreed) : null;
+            return (
+              <Card key={t.id} onClick={()=>{setWizardIdx(i);if(s==="conflict"&&!agreed){setConflictId(t.id);setPhase("conflict");}else setPhase("wizard");}} style={{cursor:"pointer"}}>
+                <div style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:36,height:36,borderRadius:10,background:agreed?T.teal10:T.g50,display:"flex",alignItems:"center",justifyContent:"center",color:agreed?T.teal:T.g400,flexShrink:0}}>
+                    <TopicIcon id={t.icon} size={18}/>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:T.g800}}>{t.label}{t.isCustom&&<span style={{fontSize:10,color:T.purple,fontWeight:600,marginLeft:6,background:T.purple10,padding:"1px 6px",borderRadius:10}}>Custom</span>}</div>
+                    {displayVal
+                      ? <div style={{fontSize:12,color:T.teal,marginTop:2,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{displayVal}</div>
+                      : s==="conflict"
+                        ? <div style={{fontSize:12,color:T.amber,marginTop:2,fontWeight:500}}>Conflict — needs resolution</div>
+                        : <div style={{fontSize:12,color:T.g400,marginTop:2}}>Tap to answer</div>
+                    }
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                    <Pill label={statusLabel} color={statusColor}/>
+                    {agreed?<span style={{color:T.mint}}>{Icon.check}</span>:<span style={{color:T.g300}}>{Icon.arrowR}</span>}
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Add custom topic */}
+        {showAddTopic ? (
+          <Card style={{padding:16,border:`1.5px solid ${T.purple}`,background:T.purple10}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.purple,marginBottom:10}}>Add a custom topic</div>
+            <div style={{fontSize:12,color:T.g500,marginBottom:10,lineHeight:1.5}}>Add any house rule the system didn't cover. You'll type the agreed decision directly.</div>
+            <input value={newTopicLabel} onChange={e=>setNewTopicLabel(e.target.value)} placeholder="Topic name (e.g. Pet Policy, Parking)" style={{...inp,marginBottom:8}}/>
+            <input value={newTopicQ} onChange={e=>setNewTopicQ(e.target.value)} placeholder="Question to discuss (optional)" style={{...inp,marginBottom:12}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{
+                if(!newTopicLabel.trim())return;
+                const id="custom_"+Date.now();
+                setCustomTopics(ct=>[...ct,{id,label:newTopicLabel.trim(),question:newTopicQ.trim()||`What is the household rule for ${newTopicLabel.trim()}?`}]);
+                setNewTopicLabel("");setNewTopicQ("");setShowAddTopic(false);
+              }} style={{flex:1,background:T.purple,border:"none",borderRadius:9,padding:"10px",color:T.white,fontWeight:700,fontSize:13}}>Add Topic</button>
+              <button onClick={()=>{setShowAddTopic(false);setNewTopicLabel("");setNewTopicQ("");}} style={{flex:1,background:T.white,border:`1.5px solid ${T.g200}`,borderRadius:9,padding:"10px",color:T.g500,fontSize:13}}>Cancel</button>
+            </div>
+          </Card>
+        ) : (
+          <button onClick={()=>setShowAddTopic(true)} style={{width:"100%",background:T.white,border:`1.5px dashed ${T.g300}`,borderRadius:12,padding:"13px",color:T.purple,fontSize:13,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            {Icon.plus} Add a custom topic
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── CHORES ────────────────────────────────────────────────────────────────────
+// rotation modes: "auto" = system assigns each week by rotating; "manual" = fixed assignment
+// CHORE_TEMPLATES: the master list of chores and how they rotate
+const CHORE_TEMPLATES_INIT = [
+  { id:1, task:"Vacuum living room",   rotation:"auto",  freq:"weekly",  assignedTo:null },
+  { id:2, task:"Clean bathroom",       rotation:"auto",  freq:"weekly",  assignedTo:null },
+  { id:3, task:"Take out recycling",   rotation:"auto",  freq:"weekly",  assignedTo:null },
+  { id:4, task:"Wipe kitchen counters",rotation:"auto",  freq:"weekly",  assignedTo:null },
+  { id:5, task:"Mop kitchen floor",    rotation:"auto",  freq:"weekly",  assignedTo:null },
+  { id:6, task:"Clean stovetop",       rotation:"manual",freq:"weekly",  assignedTo:2    },
+  { id:7, task:"Empty dishwasher",     rotation:"manual",freq:"weekly",  assignedTo:2    },
+  { id:8, task:"Clean toilet",         rotation:"manual",freq:"weekly",  assignedTo:3    },
+  { id:9, task:"Take out trash",       rotation:"auto",  freq:"weekly",  assignedTo:null },
+  { id:10,task:"Sweep entryway",       rotation:"auto",  freq:"weekly",  assignedTo:null },
+];
+
+// Auto-rotate: distribute chores across members round-robin based on week number
+function autoAssign(templates, weekOffset=0, members=MEMBERS_DEFAULT) {
+  const autoChores = templates.filter(t => t.rotation === "auto");
+  return templates.map(t => {
+    if (t.rotation === "manual") return { ...t, who: t.assignedTo };
+    const idx = autoChores.findIndex(a => a.id === t.id);
+    const who = members[(idx + weekOffset) % members.length].id;
+    return { ...t, who };
+  });
+}
+
+function buildWeekChores(templates, weekOffset, existingDone={}, members=MEMBERS_DEFAULT) {
+  return autoAssign(templates, weekOffset, members).map((t,i) => ({
+    id: t.id,
+    task: t.task,
+    who: t.who,
+    rotation: t.rotation,
+    due: "This week",
+    done: existingDone[t.id] || false,
+    late: false,
+  }));
+}
+
+function Chores({members}) {
+  const MEMBERS = members || MEMBERS_DEFAULT;
+  const [templates, setTemplates]   = useState(CHORE_TEMPLATES_INIT);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [doneSets, setDoneSets]     = useState({ 0: {1:true,2:true,4:true,5:true,6:true} });
+  const [view, setView]             = useState("mine");   // mine | household | manage
+  const [addModal, setAddModal]     = useState(false);
+  const [editChore, setEditChore]   = useState(null);     // template id being edited
+  const [newTask, setNewTask]       = useState("");
+  const [newRotation, setNewRotation] = useState("auto");
+  const [newAssignee, setNewAssignee] = useState(1);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const weekNames = ["This week","Next week","Week after"];
+  const pastWeekNames = ["Last week","2 weeks ago"];
+  const weekLabel = weekOffset === 0 ? "This week" : weekOffset > 0 ? weekNames[weekOffset]||`+${weekOffset}w` : pastWeekNames[-weekOffset-1]||`${weekOffset}w`;
+
+  const chores = buildWeekChores(templates, weekOffset, doneSets[weekOffset]||{}, MEMBERS);
+
+  function toggleDone(id) {
+    setDoneSets(ds => {
+      const curr = ds[weekOffset] || {};
+      const next = { ...curr, [id]: !curr[id] };
+      return { ...ds, [weekOffset]: next };
+    });
+  }
+
+  function addChore() {
+    if (!newTask.trim()) return;
+    const id = Date.now();
+    setTemplates(ts => [...ts, {
+      id, task: newTask.trim(),
+      rotation: newRotation,
+      freq: "weekly",
+      assignedTo: newRotation === "manual" ? newAssignee : null,
+    }]);
+    setNewTask(""); setNewRotation("auto"); setNewAssignee(1); setAddModal(false);
+  }
+
+  function updateChore(id) {
+    setTemplates(ts => ts.map(t => t.id === id ? {
+      ...t, task: newTask||t.task,
+      rotation: newRotation,
+      assignedTo: newRotation === "manual" ? newAssignee : null,
+    } : t));
+    setEditChore(null); setNewTask(""); setNewRotation("auto"); setNewAssignee(1);
+  }
+
+  function deleteChore(id) {
+    setTemplates(ts => ts.filter(t => t.id !== id));
+    setConfirmDelete(null);
+  }
+
+  function openEdit(t) {
+    setEditChore(t.id); setNewTask(t.task);
+    setNewRotation(t.rotation); setNewAssignee(t.assignedTo || 1);
+  }
+
+  const my    = chores.filter(c => c.who === 1);
+  const myDone= my.filter(c => c.done).length;
+  const myPct = my.length ? Math.round((myDone/my.length)*100) : 100;
+  const total = chores.length;
+  const tdone = chores.filter(c => c.done).length;
+  const tlate = chores.filter(c => c.late && !c.done).length;
+  const stats = MEMBERS.map(m => {
+    const mc = chores.filter(c => c.who === m.id);
+    const md = mc.filter(c => c.done).length;
+    const lc = mc.filter(c => c.late && !c.done).length;
+    return { ...m, total:mc.length, done:md, pct:mc.length?Math.round((md/mc.length)*100):100, late:lc, chores:mc };
+  });
+
+  // ── MANAGE VIEW ──
+  if (view === "manage") return (
+    <div style={{background:T.g50,minHeight:"100vh",paddingBottom:80}}>
+      <TopBar title="Manage Chores" sub="Configure tasks & rotation"
+        right={<button onClick={()=>setView("mine")} style={{background:"none",border:"none",color:T.teal,fontSize:13,fontWeight:600}}>Done</button>}/>
+
+      {/* Rotation explainer */}
+      <div style={{padding:"12px 16px 0"}}>
+        <Card style={{padding:14,marginBottom:12,background:T.teal10,border:`1px solid ${T.teal20}`}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.tealDk,marginBottom:6}}>How auto-rotation works</div>
+          <div style={{fontSize:12,color:T.g600,lineHeight:1.6}}>
+            Chores set to <strong>Auto-rotate</strong> are distributed evenly across all members each week. The assignment shifts by one person every week so no one gets the same chores repeatedly. Chores set to <strong>Fixed</strong> always go to the same person.
+          </div>
+          <div style={{display:"flex",gap:6,marginTop:10}}>
+            {MEMBERS.map((m,i) => (
+              <div key={m.id} style={{flex:1,background:T.white,borderRadius:8,padding:"6px 4px",textAlign:"center",border:`1px solid ${T.teal20}`}}>
+                <Av m={m} size={24}/>
+                <div style={{fontSize:10,color:T.tealDk,marginTop:4,fontWeight:600}}>{m.short}</div>
+                <div style={{fontSize:9,color:T.g400,marginTop:1}}>Week {weekOffset+1}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:11,color:T.g500,marginTop:8}}>
+            Auto chores: <strong>{templates.filter(t=>t.rotation==="auto").length}</strong> rotating across {MEMBERS.length} members · <strong>{Math.ceil(templates.filter(t=>t.rotation==="auto").length/MEMBERS.length)}</strong> per person
+          </div>
+        </Card>
+
+        {/* Week navigator */}
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,padding:"10px 14px",background:T.white,border:`1px solid ${T.g200}`,borderRadius:12}}>
+          <button onClick={()=>setWeekOffset(w=>w-1)} style={{background:T.g100,border:"none",borderRadius:8,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",color:T.g600}}>{Icon.arrowL}</button>
+          <div style={{flex:1,textAlign:"center"}}>
+            <div style={{fontSize:14,fontWeight:700,color:T.g800}}>{weekLabel}</div>
+            <div style={{fontSize:11,color:T.g400}}>Preview rotation</div>
+          </div>
+          <button onClick={()=>setWeekOffset(w=>w+1)} style={{background:T.g100,border:"none",borderRadius:8,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",color:T.g600}}>{Icon.arrowR}</button>
+        </div>
+
+        {/* Chore list with assignment preview */}
+        <div style={{fontSize:11,fontWeight:700,color:T.g400,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>
+          All chores ({templates.length})
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+          {chores.map(c => {
+            const t = templates.find(x=>x.id===c.id);
+            const assignee = MEMBERS.find(m=>m.id===c.who);
+            const isEditing = editChore === c.id;
+
+            if (isEditing) return (
+              <Card key={c.id} style={{border:`1.5px solid ${T.teal}`,background:T.teal10}}>
+                <div style={{padding:14}}>
+                  <div style={{fontSize:12,fontWeight:700,color:T.teal,marginBottom:10}}>Editing chore</div>
+                  <input value={newTask} onChange={e=>setNewTask(e.target.value)} style={{...inp,marginBottom:10,background:T.white}} placeholder="Task name"/>
+                  <div style={{fontSize:12,fontWeight:600,color:T.g500,marginBottom:8}}>Assignment type</div>
+                  <div style={{display:"flex",gap:6,marginBottom:newRotation==="manual"?10:14}}>
+                    {[{v:"auto",label:"Auto-rotate"},{v:"manual",label:"Fixed person"}].map(opt=>(
+                      <button key={opt.v} onClick={()=>setNewRotation(opt.v)} style={{flex:1,background:newRotation===opt.v?T.teal:T.white,border:`1.5px solid ${newRotation===opt.v?T.teal:T.g200}`,borderRadius:8,padding:"8px",color:newRotation===opt.v?T.white:T.g600,fontSize:12,fontWeight:600}}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {newRotation==="manual"&&<>
+                    <div style={{fontSize:12,fontWeight:600,color:T.g500,marginBottom:8}}>Assign to</div>
+                    <div style={{display:"flex",gap:6,marginBottom:14}}>
+                      {MEMBERS.map(m=>(
+                        <button key={m.id} onClick={()=>setNewAssignee(m.id)} style={{flex:1,background:newAssignee===m.id?m.color:T.white,border:`1.5px solid ${newAssignee===m.id?m.color:T.g200}`,borderRadius:8,padding:"8px 4px",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                          <Av m={m} size={24}/>
+                          <span style={{fontSize:11,color:newAssignee===m.id?T.white:T.g600,fontWeight:600}}>{m.short}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>}
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>updateChore(c.id)} style={{flex:1,background:T.teal,border:"none",borderRadius:8,padding:"9px",color:T.white,fontWeight:700,fontSize:13}}>Save</button>
+                    <button onClick={()=>{setEditChore(null);setNewTask("");}} style={{flex:1,background:T.white,border:`1.5px solid ${T.g200}`,borderRadius:8,padding:"9px",color:T.g500,fontSize:13}}>Cancel</button>
+                  </div>
+                </div>
+              </Card>
+            );
+
+            return (
+              <Card key={c.id}>
+                <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:T.g800,marginBottom:4}}>{c.task}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <Pill label={t?.rotation==="auto"?"Auto-rotate":"Fixed"} color={t?.rotation==="auto"?T.teal:T.purple}/>
+                      <div style={{display:"flex",alignItems:"center",gap:4}}>
+                        <Av m={assignee} size={16}/>
+                        <span style={{fontSize:11,color:T.g500}}>{weekLabel}: {assignee?.short}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    <button onClick={()=>openEdit(t)} style={{background:T.g100,border:"none",borderRadius:8,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",color:T.g500}}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button onClick={()=>setConfirmDelete(c.id)} style={{background:T.red10,border:"none",borderRadius:8,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",color:T.red}}>
+                      {Icon.trash}
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Add new chore */}
+        {addModal ? (
+          <Card style={{padding:14,border:`1.5px solid ${T.teal}`,background:T.teal10}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.tealDk,marginBottom:10}}>New chore</div>
+            <input value={newTask} onChange={e=>setNewTask(e.target.value)} placeholder="e.g. Wipe windows" style={{...inp,marginBottom:10,background:T.white}}/>
+            <div style={{fontSize:12,fontWeight:600,color:T.g500,marginBottom:8}}>Assignment type</div>
+            <div style={{display:"flex",gap:6,marginBottom:newRotation==="manual"?10:14}}>
+              {[{v:"auto",label:"Auto-rotate"},{v:"manual",label:"Fixed person"}].map(opt=>(
+                <button key={opt.v} onClick={()=>setNewRotation(opt.v)} style={{flex:1,background:newRotation===opt.v?T.teal:T.white,border:`1.5px solid ${newRotation===opt.v?T.teal:T.g200}`,borderRadius:8,padding:"8px",color:newRotation===opt.v?T.white:T.g600,fontSize:12,fontWeight:600}}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {newRotation==="manual"&&<>
+              <div style={{fontSize:12,fontWeight:600,color:T.g500,marginBottom:8}}>Always assigned to</div>
+              <div style={{display:"flex",gap:6,marginBottom:14}}>
+                {MEMBERS.map(m=>(
+                  <button key={m.id} onClick={()=>setNewAssignee(m.id)} style={{flex:1,background:newAssignee===m.id?m.color:T.white,border:`1.5px solid ${newAssignee===m.id?m.color:T.g200}`,borderRadius:8,padding:"8px 4px",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                    <Av m={m} size={24}/>
+                    <span style={{fontSize:11,color:newAssignee===m.id?T.white:T.g600,fontWeight:600}}>{m.short}</span>
+                  </button>
+                ))}
+              </div>
+            </>}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={addChore} style={{flex:1,background:T.teal,border:"none",borderRadius:8,padding:"10px",color:T.white,fontWeight:700,fontSize:13}}>Add Chore</button>
+              <button onClick={()=>{setAddModal(false);setNewTask("");}} style={{flex:1,background:T.white,border:`1.5px solid ${T.g200}`,borderRadius:8,padding:"10px",color:T.g500,fontSize:13}}>Cancel</button>
+            </div>
+          </Card>
+        ) : (
+          <button onClick={()=>setAddModal(true)} style={{width:"100%",background:T.white,border:`1.5px dashed ${T.g300}`,borderRadius:12,padding:"13px",color:T.teal,fontSize:14,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            {Icon.plus} Add a chore
+          </button>
+        )}
+      </div>
+
+      {/* Delete confirmation modal */}
+      {confirmDelete&&<div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:24}}>
+        <Card style={{padding:20,width:"100%",maxWidth:340}}>
+          <div style={{fontSize:16,fontWeight:700,color:T.g900,marginBottom:8}}>Remove this chore?</div>
+          <div style={{fontSize:13,color:T.g500,marginBottom:20}}>"{templates.find(t=>t.id===confirmDelete)?.task}" will be removed from the rotation permanently.</div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>deleteChore(confirmDelete)} style={{flex:1,background:T.red,border:"none",borderRadius:9,padding:"11px",color:T.white,fontWeight:700,fontSize:14}}>Remove</button>
+            <button onClick={()=>setConfirmDelete(null)} style={{flex:1,background:T.white,border:`1.5px solid ${T.g200}`,borderRadius:9,padding:"11px",color:T.g600,fontSize:14}}>Cancel</button>
+          </div>
+        </Card>
+      </div>}
+    </div>
+  );
+
+  // ── MINE + HOUSEHOLD VIEWS ──
+  return <div style={{background:T.g50,minHeight:"100vh",paddingBottom:80}}>
+    <TopBar title="Chore Rotation" sub={weekLabel}
+      right={<button onClick={()=>setView("manage")} style={{background:T.g100,border:"none",borderRadius:20,padding:"6px 14px",color:T.g700,fontSize:12,fontWeight:600,display:"flex",alignItems:"center",gap:6}}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Manage
+      </button>}/>
+
+    {/* Week nav strip */}
+    <div style={{padding:"10px 16px 0",display:"flex",alignItems:"center",gap:8}}>
+      <button onClick={()=>setWeekOffset(w=>w-1)} style={{background:T.white,border:`1px solid ${T.g200}`,borderRadius:8,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",color:T.g500,flexShrink:0}}>{Icon.arrowL}</button>
+      <div style={{flex:1,textAlign:"center",fontSize:13,fontWeight:600,color:T.g700}}>{weekLabel}</div>
+      <button onClick={()=>setWeekOffset(w=>w+1)} style={{background:T.white,border:`1px solid ${T.g200}`,borderRadius:8,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",color:T.g500,flexShrink:0}}>{Icon.arrowR}</button>
+    </div>
+
+    <div style={{padding:"10px 16px 0",display:"flex",gap:6}}>
+      {["mine","household"].map(v=><button key={v} onClick={()=>setView(v)} style={{flex:1,background:view===v?T.teal:T.white,border:`1.5px solid ${view===v?T.teal:T.g200}`,borderRadius:10,padding:"9px",color:view===v?T.white:T.g600,fontSize:13,fontWeight:600}}>{v==="mine"?"My Chores":"Household"}</button>)}
+    </div>
+
+    {view==="mine"?<div style={{padding:"12px 16px"}}>
+      <Card style={{padding:16,marginBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:16}}>
+          <Ring pct={myPct} size={64} sw={5} color={myPct===100?T.mint:myPct>60?T.teal:T.amber}/>
+          <div style={{flex:1}}>
+            <div style={{fontSize:22,fontWeight:800,color:T.g900}}>{myDone}<span style={{fontSize:14,color:T.g400,fontWeight:500}}>/{my.length} done</span></div>
+            <div style={{fontSize:12,color:T.g400,marginTop:2}}>{weekLabel}</div>
+            {myPct===100&&<div style={{marginTop:6}}><Pill label="All done" color={T.mint}/></div>}
+          </div>
+        </div>
+      </Card>
+      {my.length===0
+        ? <div style={{textAlign:"center",padding:"32px 0",color:T.g400,fontSize:13}}>No chores assigned to you this week.</div>
+        : <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {my.map(c=>(
+            <button key={c.id} onClick={()=>toggleDone(c.id)} style={{display:"flex",alignItems:"center",gap:12,background:T.white,border:`1px solid ${c.done?T.teal+"44":T.g200}`,borderRadius:12,padding:"12px 14px",textAlign:"left",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
+              <div style={{width:24,height:24,borderRadius:6,background:c.done?T.teal:T.white,border:`2px solid ${c.done?T.teal:T.g300}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:T.white}}>{c.done&&Icon.check}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:500,color:c.done?T.g400:T.g800,textDecoration:c.done?"line-through":"none"}}>{c.task}</div>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3}}>
+                  <Pill label={c.rotation==="auto"?"Auto-assigned":"Fixed"} color={c.rotation==="auto"?T.teal:T.purple}/>
+                </div>
+              </div>
+              {c.done&&<Pill label="Done" color={T.mint}/>}
+            </button>
+          ))}
+        </div>
+      }
+    </div>:<div style={{padding:"12px 16px"}}>
+      <div style={{display:"flex",gap:8,marginBottom:12}}>
+        {[{l:"Completion",v:`${total?Math.round((tdone/total)*100):100}%`,c:T.teal},{l:"Done",v:tdone,c:T.mint},{l:"Overdue",v:tlate,c:tlate>0?T.red:T.mint}].map(s=><Card key={s.l} style={{flex:1,padding:"10px 8px",textAlign:"center"}}><div style={{fontSize:20,fontWeight:800,color:s.c}}>{s.v}</div><div style={{fontSize:10,color:T.g400,marginTop:2,fontWeight:500}}>{s.l}</div></Card>)}
+      </div>
+      {stats.map(m=>(
+        <Card key={m.id} style={{marginBottom:10,border:`1.5px solid ${m.late>0?T.red+"44":T.g200}`,background:m.late>0?T.red10:T.white}}>
+          <div style={{padding:"14px 16px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <Av m={m} size={38}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:700,color:m.late>0?T.red:T.g800}}>{m.name}</div>
+                <div style={{fontSize:12,color:T.g400}}>{m.done}/{m.total} done · {m.late>0?`${m.late} overdue`:"on track"}</div>
+              </div>
+              <Ring pct={m.pct} size={44} sw={4} color={m.pct===100?T.mint:m.late>0?T.red:T.amber}/>
+            </div>
+            <Bar pct={m.pct} color={m.late>0?T.red:T.teal}/>
+            {m.chores.length>0&&<div style={{marginTop:10,display:"flex",flexDirection:"column",gap:5}}>
+              {m.chores.map(c=><div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:16,height:16,borderRadius:4,background:c.done?T.teal:T.white,border:`1.5px solid ${c.done?T.teal:T.g300}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    {c.done&&<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </div>
+                  <span style={{fontSize:12,color:c.done?T.g400:T.g600,textDecoration:c.done?"line-through":"none"}}>{c.task}</span>
+                </div>
+                {c.late&&<Pill label="Overdue" color={T.red}/>}
+                {c.done&&<Pill label="Done" color={T.mint}/>}
+              </div>)}
+            </div>}
+          </div>
+        </Card>
+      ))}
+    </div>}
+  </div>;
+}
+
+
+// ── EXPENSES ─────────────────────────────────────────────────────────────────
+// HOW THIS WORKS:
+// - One person pays a shared bill upfront (e.g. Maya pays $87.50 hydro).
+// - Each other member owes their equal share ($29.17 each).
+// - "Mark as paid" = confirming you have paid the person back in real life
+//   (cash, e-transfer, etc). Money does NOT move through the app.
+// - Once all members have marked their share as paid, the expense is fully settled.
+
+const CATEGORIES = ["utilities","household","subscriptions","food","transport","other"];
+const CAT_LABELS  = {utilities:"Utilities",household:"Household",subscriptions:"Subscriptions",food:"Food",transport:"Transport",other:"Other"};
+const CAT_COLORS  = {utilities:T.blue,household:T.teal,subscriptions:T.purple,food:T.amber,transport:T.mint,other:T.g400};
+
+function expenseShare(amount, n) { return Math.round((amount/n)*100)/100; }
+
+function isFullySettled(exp) {
+  return Object.values(exp.settled).every(v => v === true);
+}
+
+function Expenses({members}) {
+  const MEMBERS = members || MEMBERS_DEFAULT;
+  const n = MEMBERS.length;
+  const [exps,    setExps]    = useState(EXPENSES_INIT);
+  const [addOpen, setAddOpen] = useState(false);
+  const [detail,  setDetail]  = useState(null); // expense id being viewed in detail
+  const [newDesc, setNewDesc] = useState("");
+  const [newAmt,  setNewAmt]  = useState("");
+  const [newBy,   setNewBy]   = useState(1);
+  const [newCat,  setNewCat]  = useState("household");
+
+  // Running balances: for each member, how much do they owe vs are owed
+  // for unsettled shares only
+  const balances = MEMBERS.map(m => {
+    let owes = 0;   // m owes others (m is a debtor on expenses paid by others)
+    let owed = 0;   // others owe m (m paid upfront, some haven't paid back yet)
+    exps.forEach(e => {
+      const share = expenseShare(e.amount, n);
+      if (e.by === m.id) {
+        // m paid — count unsettled shares owed TO m
+        Object.entries(e.settled).forEach(([mid, paid]) => {
+          if (!paid) owed += share;
+        });
+      } else {
+        // m is a debtor — does m still owe their share?
+        if (e.settled[m.id] === false) owes += share;
+      }
+    });
+    const net = Math.round((owed - owes)*100)/100;
+    return { ...m, owes: Math.round(owes*100)/100, owed: Math.round(owed*100)/100, net };
+  });
+
+  // Total pending (sum of all unsettled shares across all expenses)
+  const totalPending = exps.reduce((sum, e) => {
+    const share = expenseShare(e.amount, n);
+    return sum + Object.values(e.settled).filter(v => !v).length * share;
+  }, 0);
+
+  function markPaid(expId, memberId, paid) {
+    setExps(es => es.map(e => e.id === expId
+      ? { ...e, settled: { ...e.settled, [memberId]: paid } }
+      : e
+    ));
+  }
+
+  function addExpense() {
+    if (!newDesc.trim() || !newAmt) return;
+    const others = MEMBERS.filter(m => m.id !== newBy).reduce((o, m) => ({ ...o, [m.id]: false }), {});
+    setExps(es => [...es, {
+      id: Date.now(), desc: newDesc.trim(),
+      amount: parseFloat(newAmt), by: newBy,
+      date: "Apr 10", category: newCat, settled: others,
+    }]);
+    setNewDesc(""); setNewAmt(""); setNewBy(1); setNewCat("household"); setAddOpen(false);
+  }
+
+  function deleteExpense(id) { setExps(es => es.filter(e => e.id !== id)); setDetail(null); }
+
+  // ── DETAIL MODAL ──
+  if (detail !== null) {
+    const e = exps.find(x => x.id === detail);
+    if (!e) { setDetail(null); return null; }
+    const payer = MEMBERS.find(m => m.id === e.by);
+    const share = expenseShare(e.amount, n);
+    const fullySettled = isFullySettled(e);
+
+    return (
+      <div style={{background:T.g50,minHeight:"100vh",paddingBottom:80}}>
+        <TopBar title={e.desc} sub={`${e.date} · ${CAT_LABELS[e.category]||"Other"}`} back={()=>setDetail(null)}
+          right={<button onClick={()=>deleteExpense(e.id)} style={{background:T.red10,border:"none",borderRadius:8,padding:"6px 10px",color:T.red,fontSize:12,fontWeight:600}}>{Icon.trash}</button>}/>
+        <div style={{padding:"14px 16px"}}>
+
+          {/* How it works banner */}
+          <div style={{background:T.blue10,border:`1px solid ${T.blue}22`,borderRadius:12,padding:"10px 14px",marginBottom:14,display:"flex",gap:10,alignItems:"flex-start"}}>
+            <span style={{color:T.blue,flexShrink:0,marginTop:1}}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </span>
+            <div style={{fontSize:12,color:T.blue,lineHeight:1.5}}>
+              <strong>{payer.short}</strong> paid <strong>${e.amount.toFixed(2)}</strong> upfront.
+              Each person owes <strong>${share.toFixed(2)}</strong> back to {payer.short} outside the app — cash, e-transfer, or however you prefer.
+              Tap <strong>"Mark as paid"</strong> once you've paid them back in real life.
+            </div>
+          </div>
+
+          {/* Amount summary card */}
+          <Card style={{padding:"16px 18px",marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:T.g400,marginBottom:4}}>Total paid upfront</div>
+                <div style={{fontSize:28,fontWeight:800,color:T.g900}}>${e.amount.toFixed(2)}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:13,fontWeight:600,color:T.g400,marginBottom:4}}>Per person</div>
+                <div style={{fontSize:28,fontWeight:800,color:T.teal}}>${share.toFixed(2)}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:12,borderTop:`1px solid ${T.g100}`}}>
+              <Av m={payer} size={28}/>
+              <div style={{flex:1}}>
+                <span style={{fontSize:13,fontWeight:600,color:T.g700}}>{payer.name}</span>
+                <span style={{fontSize:12,color:T.g400}}> paid the full bill</span>
+              </div>
+              <Pill label="Bill payer" color={T.teal}/>
+            </div>
+          </Card>
+
+          {/* Per-member payment status */}
+          <div style={{fontSize:11,fontWeight:700,color:T.g400,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>
+            Who has paid {payer.short} back
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+            {MEMBERS.filter(m => m.id !== e.by).map(m => {
+              const paid = e.settled[m.id];
+              return (
+                <Card key={m.id} style={{border:`1.5px solid ${paid?T.mint+"66":T.red+"33"}`,background:paid?T.teal10:T.white}}>
+                  <div style={{padding:"13px 16px",display:"flex",alignItems:"center",gap:12}}>
+                    <Av m={m} size={36}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:600,color:T.g800}}>{m.name}</div>
+                      <div style={{fontSize:12,color:T.g400,marginTop:2}}>
+                        {paid
+                          ? `Paid ${payer.short} back $${share.toFixed(2)}`
+                          : `Owes ${payer.short} $${share.toFixed(2)}`
+                        }
+                      </div>
+                    </div>
+                    {paid
+                      ? <div style={{display:"flex",alignItems:"center",gap:6,color:T.mint}}>
+                          <span style={{color:T.mint}}>{Icon.check}</span>
+                          <span style={{fontSize:12,fontWeight:700,color:T.mint}}>Paid</span>
+                          <button onClick={()=>markPaid(e.id,m.id,false)} style={{background:"none",border:"none",color:T.g400,fontSize:11,marginLeft:4}}>undo</button>
+                        </div>
+                      : <button onClick={()=>markPaid(e.id,m.id,true)} style={{background:T.teal,border:"none",borderRadius:9,padding:"7px 14px",color:T.white,fontSize:12,fontWeight:700}}>
+                          Mark as paid
+                        </button>
+                    }
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {fullySettled && (
+            <div style={{background:T.teal10,border:`1px solid ${T.teal20}`,borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+              <span style={{color:T.teal}}>{Icon.check}</span>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:T.teal}}>Fully settled</div>
+                <div style={{fontSize:12,color:T.g500}}>Everyone has paid {payer.short} back for this expense.</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── MAIN LIST VIEW ──
+  const unsettled = exps.filter(e => !isFullySettled(e));
+  const settled   = exps.filter(e => isFullySettled(e));
+
+  return (
+    <div style={{background:T.g50,minHeight:"100vh",paddingBottom:80}}>
+      <TopBar title="Expense Tracker" sub={`$${totalPending.toFixed(2)} pending payback`}
+        right={<button onClick={()=>setAddOpen(a=>!a)} style={{background:T.teal,border:"none",borderRadius:20,padding:"7px 16px",color:T.white,fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:6}}>{Icon.plus}Add</button>}/>
+
+      {/* Add expense form */}
+      {addOpen && (
+        <div style={{padding:"12px 16px 0"}}>
+          <Card style={{padding:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.g700,marginBottom:12}}>New shared expense</div>
+            <input value={newDesc} onChange={e=>setNewDesc(e.target.value)} placeholder="What was it? (e.g. Netflix, Groceries)" style={{...inp,marginBottom:10}}/>
+            <input value={newAmt} onChange={e=>setNewAmt(e.target.value)} placeholder="Total amount ($)" type="number" style={{...inp,marginBottom:10}}/>
+
+            <div style={{fontSize:12,fontWeight:600,color:T.g500,marginBottom:8}}>Who paid upfront?</div>
+            <div style={{display:"flex",gap:6,marginBottom:12}}>
+              {MEMBERS.map(m=>(
+                <button key={m.id} onClick={()=>setNewBy(m.id)} style={{flex:1,background:newBy===m.id?m.color:T.white,border:`1.5px solid ${newBy===m.id?m.color:T.g200}`,borderRadius:9,padding:"8px 4px",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                  <Av m={m} size={24}/>
+                  <span style={{fontSize:11,color:newBy===m.id?T.white:T.g600,fontWeight:600}}>{m.short}</span>
+                </button>
+              ))}
+            </div>
+
+            <div style={{fontSize:12,fontWeight:600,color:T.g500,marginBottom:8}}>Category</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+              {CATEGORIES.map(cat=>(
+                <button key={cat} onClick={()=>setNewCat(cat)} style={{background:newCat===cat?CAT_COLORS[cat]:T.white,border:`1.5px solid ${newCat===cat?CAT_COLORS[cat]:T.g200}`,borderRadius:20,padding:"5px 12px",color:newCat===cat?T.white:T.g600,fontSize:12,fontWeight:500}}>
+                  {CAT_LABELS[cat]}
+                </button>
+              ))}
+            </div>
+
+            {newDesc && newAmt && (
+              <div style={{background:T.teal10,border:`1px solid ${T.teal20}`,borderRadius:8,padding:"8px 12px",marginBottom:10,fontSize:12,color:T.tealDk}}>
+                Each person owes <strong>${expenseShare(parseFloat(newAmt)||0, n).toFixed(2)}</strong> back to {MEMBERS.find(m=>m.id===newBy)?.short}
+              </div>
+            )}
+
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={addExpense} style={{flex:1,background:T.teal,border:"none",borderRadius:9,padding:"10px",color:T.white,fontWeight:700,fontSize:13}}>Add</button>
+              <button onClick={()=>setAddOpen(false)} style={{flex:1,background:T.white,border:`1.5px solid ${T.g200}`,borderRadius:9,padding:"10px",color:T.g500,fontSize:13}}>Cancel</button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Running balances */}
+      <Sec label="Running balances"/>
+      <div style={{padding:"0 16px 4px"}}>
+        <div style={{fontSize:12,color:T.g400,marginBottom:8,lineHeight:1.5}}>
+          <strong style={{color:T.g600}}>How to read this:</strong> A positive balance means others still owe you money. A negative balance means you still owe others.
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          {balances.map(m=>(
+            <Card key={m.id} style={{flex:1,padding:"12px 8px",textAlign:"center",border:`1.5px solid ${m.net>0?T.mint+"66":m.net<0?T.red+"44":T.g200}`}}>
+              <Av m={m} size={30}/>
+              <div style={{fontSize:14,fontWeight:800,color:m.net>0?T.mint:m.net<0?T.red:T.g400,marginTop:7,letterSpacing:-0.3}}>
+                {m.net>0?`+$${m.net.toFixed(2)}`:m.net<0?`-$${Math.abs(m.net).toFixed(2)}`:"Settled"}
+              </div>
+              <div style={{fontSize:10,color:T.g400,marginTop:1}}>{m.short}</div>
+              {m.net!==0&&<div style={{fontSize:10,color:T.g400,marginTop:2}}>
+                {m.net>0?`is owed $${m.owed.toFixed(2)}`:`owes $${m.owes.toFixed(2)}`}
+              </div>}
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Unsettled expenses */}
+      {unsettled.length>0&&<>
+        <Sec label={`Pending (${unsettled.length})`}/>
+        <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:8}}>
+          {unsettled.map(e => {
+            const payer = MEMBERS.find(m=>m.id===e.by);
+            const share = expenseShare(e.amount, n);
+            const settledCount = Object.values(e.settled).filter(Boolean).length;
+            const totalOwers   = Object.keys(e.settled).length;
+            const catColor = CAT_COLORS[e.category]||T.g400;
+            return (
+              <Card key={e.id} onClick={()=>setDetail(e.id)} style={{cursor:"pointer"}}>
+                <div style={{padding:"13px 16px"}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:10}}>
+                    <div style={{width:38,height:38,borderRadius:10,background:catColor+"18",border:`1px solid ${catColor}33`,display:"flex",alignItems:"center",justifyContent:"center",color:catColor,flexShrink:0}}>
+                      {Icon.expenses}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:700,color:T.g800}}>{e.desc}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3}}>
+                        <span style={{fontSize:11,color:T.g400}}>Paid by</span>
+                        <Av m={payer} size={16}/>
+                        <span style={{fontSize:11,color:T.g600,fontWeight:600}}>{payer.short}</span>
+                        <span style={{fontSize:11,color:T.g300}}>·</span>
+                        <span style={{fontSize:11,color:T.g400}}>{e.date}</span>
+                      </div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:16,fontWeight:800,color:T.g800}}>${e.amount.toFixed(2)}</div>
+                      <div style={{fontSize:11,color:T.g400,marginTop:2}}>${share.toFixed(2)}/person</div>
+                    </div>
+                  </div>
+
+                  {/* Per-member status row */}
+                  <div style={{borderTop:`1px solid ${T.g100}`,paddingTop:10,display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:11,color:T.g400,flexShrink:0}}>Paid back:</span>
+                    <div style={{display:"flex",gap:5,flex:1}}>
+                      {MEMBERS.filter(m=>m.id!==e.by).map(m=>{
+                        const paid=e.settled[m.id];
+                        return (
+                          <div key={m.id} style={{display:"flex",alignItems:"center",gap:4,background:paid?T.mint+"18":T.red10,borderRadius:20,padding:"3px 8px 3px 4px",border:`1px solid ${paid?T.mint+"44":T.red+"33"}`}}>
+                            <Av m={m} size={16}/>
+                            <span style={{fontSize:11,fontWeight:600,color:paid?T.mint:T.red}}>{m.short}</span>
+                            {paid&&<span style={{color:T.mint,display:"flex"}}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <span style={{color:T.g300,flexShrink:0}}>{Icon.arrowR}</span>
+                  </div>
+
+                  {settledCount>0&&<div style={{marginTop:8}}>
+                    <Bar pct={(settledCount/totalOwers)*100} color={T.mint} h={4}/>
+                    <div style={{fontSize:11,color:T.g400,marginTop:4}}>{settledCount}/{totalOwers} paid back</div>
+                  </div>}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </>}
+
+      {/* Fully settled */}
+      {settled.length>0&&<>
+        <Sec label={`Settled (${settled.length})`}/>
+        <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:8}}>
+          {settled.map(e=>{
+            const payer=MEMBERS.find(m=>m.id===e.by);
+            return (
+              <Card key={e.id} onClick={()=>setDetail(e.id)} style={{opacity:0.6,cursor:"pointer"}}>
+                <div style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+                  <Av m={payer} size={32}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:600,color:T.g500,textDecoration:"line-through"}}>{e.desc}</div>
+                    <div style={{fontSize:11,color:T.g400,marginTop:1}}>Paid by {payer.short} · {e.date} · everyone paid back</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:14,fontWeight:700,color:T.g400}}>${e.amount.toFixed(2)}</div>
+                    <Pill label="Settled" color={T.mint}/>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </>}
+    </div>
+  );
+}
+
+// ── AMENITIES ─────────────────────────────────────────────────────────────────
+// bookings structure: { amenityId: { "Day|slot": { memberId, recurring } } }
+const DAYS = ["Mon Apr 7","Tue Apr 8","Wed Apr 9","Thu Apr 10","Fri Apr 11","Sat Apr 12","Sun Apr 13"];
+const SHORT_DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+const AMENITIES_INIT = [
+  {id:"laundry",label:"Laundry",   icon:"laundry"},
+  {id:"kitchen",label:"Kitchen",   icon:"kitchen"},
+  {id:"shower", label:"Shower",    icon:"shower"},
+  {id:"living", label:"Living Rm", icon:"living"},
+];
+
+const BOOKINGS_INIT2 = {
+  "laundry|Mon Apr 7|8am":  {memberId:1, recurring:false},
+  "laundry|Mon Apr 7|2pm":  {memberId:2, recurring:false},
+  "laundry|Tue Apr 8|6pm":  {memberId:3, recurring:false},
+  "laundry|Wed Apr 9|8am":  {memberId:1, recurring:true},
+  "kitchen|Mon Apr 7|7am":  {memberId:1, recurring:true},
+  "kitchen|Mon Apr 7|12pm": {memberId:2, recurring:false},
+  "shower|Mon Apr 7|7am":   {memberId:1, recurring:true},
+  "shower|Mon Apr 7|8am":   {memberId:2, recurring:false},
+  "shower|Mon Apr 7|9am":   {memberId:3, recurring:false},
+  "living|Mon Apr 7|7pm":   {memberId:2, recurring:false},
+};
+
+function Amenities({currentUser,members}) {
+  const MEMBERS = members || MEMBERS_DEFAULT;
+  const [amenities,setAmenities] = useState(AMENITIES_INIT);
+  const [bookings,setBookings]   = useState(BOOKINGS_INIT2);
+  const [sel,setSel]             = useState("laundry");
+  const [dayIdx,setDayIdx]       = useState(0);
+  const [tabView,setTabView]     = useState("book"); // book | all
+  const [addForm,setAddForm]     = useState(false);
+  const [newLabel,setNewLabel]   = useState("");
+  const [bookModal,setBookModal] = useState(null); // {slot}
+  const [recurring,setRecurring] = useState(false);
+
+  const day = DAYS[dayIdx];
+  const me  = currentUser || {name:"Leticia",initials:"LL"};
+  const meId = 1; // current user is always member 1 in this demo
+
+  function key(amenityId, day, slot) { return `${amenityId}|${day}|${slot}`; }
+  function getBooking(amenityId, day, slot) { return bookings[key(amenityId,day,slot)]; }
+  function isMine(b) { return b && b.memberId === meId; }
+
+  function doBook(slot, rec) {
+    const k = key(sel, day, slot);
+    if (bookings[k]) return;
+    setBookings(b => {
+      const nb = {...b, [k]:{memberId:meId, recurring:rec}};
+      // if recurring, also fill same slot for remaining days of week
+      if (rec) {
+        DAYS.forEach((d,i) => {
+          if (i > dayIdx) {
+            const rk = key(sel,d,slot);
+            if (!nb[rk]) nb[rk] = {memberId:meId, recurring:true};
+          }
+        });
+      }
+      return nb;
+    });
+    setBookModal(null);
+  }
+
+  function cancelBooking(amenityId, d, slot) {
+    const k = key(amenityId,d,slot);
+    const bk = bookings[k];
+    setBookings(b => {
+      const nb = {...b};
+      delete nb[k];
+      // if recurring cancel all future instances too
+      if (bk && bk.recurring) {
+        DAYS.forEach(dd => { const rk=key(amenityId,dd,slot); if(nb[rk]&&nb[rk].memberId===meId&&nb[rk].recurring) delete nb[rk]; });
+      }
+      return nb;
+    });
+  }
+
+  function addAmenity() {
+    if (!newLabel.trim()) return;
+    const id = newLabel.toLowerCase().replace(/\s+/g,"-")+"-"+Date.now();
+    setAmenities(a=>[...a,{id,label:newLabel.trim(),icon:"living"}]);
+    setNewLabel(""); setAddForm(false); setSel(id);
+  }
+
+  // All bookings flat list
+  const allBookings = Object.entries(bookings).map(([k,v]) => {
+    const [amenityId,d,slot] = k.split("|");
+    const amenity = amenities.find(a=>a.id===amenityId);
+    const member  = MEMBERS.find(m=>m.id===v.memberId);
+    return {key:k, amenityId, amenityLabel:amenity?.label||amenityId, day:d, slot, memberId:v.memberId, memberName:member?.short||"?", memberColor:member?.color||T.g400, recurring:v.recurring};
+  }).sort((a,b)=>{ const di=DAYS.indexOf(a.day)-DAYS.indexOf(b.day); if(di!==0)return di; return SLOTS.indexOf(a.slot)-SLOTS.indexOf(b.slot); });
+
+  const currSlots = SLOTS.map(slot => ({slot, booking: getBooking(sel,day,slot)}));
+
+  return <div style={{background:T.g50,minHeight:"100vh",paddingBottom:80}}>
+    <TopBar title="Amenities Scheduler" sub="Book shared spaces"
+      right={<button onClick={()=>setAddForm(a=>!a)} style={{background:T.teal,border:"none",borderRadius:20,padding:"7px 14px",color:T.white,fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:6}}>{Icon.plus}Add</button>}/>
+
+    {/* Add amenity form */}
+    {addForm&&<div style={{padding:"12px 16px 0"}}>
+      <Card style={{padding:14}}>
+        <div style={{fontSize:13,fontWeight:700,color:T.g700,marginBottom:10}}>Add a new amenity</div>
+        <input value={newLabel} onChange={e=>setNewLabel(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addAmenity()} placeholder="e.g. Gym, Parking, BBQ" style={{...inp,marginBottom:10}}/>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={addAmenity} style={{flex:1,background:T.teal,border:"none",borderRadius:9,padding:"10px",color:T.white,fontWeight:700,fontSize:13}}>Add</button>
+          <button onClick={()=>setAddForm(false)} style={{flex:1,background:T.white,border:`1.5px solid ${T.g200}`,borderRadius:9,padding:"10px",color:T.g500,fontSize:13}}>Cancel</button>
+        </div>
+      </Card>
+    </div>}
+
+    {/* View toggle */}
+    <div style={{padding:"12px 16px 0",display:"flex",gap:6}}>
+      {[{id:"book",label:"Book"},{id:"all",label:"All Bookings"}].map(t=>(
+        <button key={t.id} onClick={()=>setTabView(t.id)} style={{flex:1,background:tabView===t.id?T.teal:T.white,border:`1.5px solid ${tabView===t.id?T.teal:T.g200}`,borderRadius:10,padding:"9px",color:tabView===t.id?T.white:T.g600,fontSize:13,fontWeight:600}}>
+          {t.label}
+        </button>
+      ))}
+    </div>
+
+    {tabView==="book"&&<>
+      {/* Amenity tiles */}
+      <div style={{padding:"12px 16px 0",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        {amenities.map(a=>{
+          const cnt = Object.keys(bookings).filter(k=>k.startsWith(a.id+"|")).length;
+          return <button key={a.id} onClick={()=>setSel(a.id)} style={{background:sel===a.id?T.teal10:T.white,border:`2px solid ${sel===a.id?T.teal:T.g200}`,borderRadius:12,padding:"13px 12px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
+            <span style={{color:sel===a.id?T.teal:T.g500}}><TopicIcon id={a.icon} size={20}/></span>
+            <div style={{textAlign:"left",minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:700,color:sel===a.id?T.teal:T.g800,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.label}</div>
+              <div style={{fontSize:11,color:T.g400}}>{cnt} booked</div>
+            </div>
+          </button>;
+        })}
+      </div>
+
+      {/* Day strip */}
+      <div style={{padding:"12px 16px 0",display:"flex",gap:6,overflowX:"auto"}}>
+        {DAYS.map((d,i)=>(
+          <button key={d} onClick={()=>setDayIdx(i)} style={{background:dayIdx===i?T.teal:T.white,border:`1.5px solid ${dayIdx===i?T.teal:T.g200}`,borderRadius:10,padding:"6px 0",color:dayIdx===i?T.white:T.g600,fontSize:12,fontWeight:600,flexShrink:0,width:46,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+            <span style={{fontSize:10,fontWeight:500,opacity:0.75}}>{SHORT_DAYS[i]}</span>
+            <span style={{fontSize:13,fontWeight:700}}>{d.split(" ")[2]}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Slot list */}
+      <div style={{padding:"12px 16px 0"}}>
+        <div style={{fontSize:12,fontWeight:700,color:T.g400,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>
+          {amenities.find(a=>a.id===sel)?.label} · {day}
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {currSlots.map(({slot,booking})=>{
+            const mem = booking ? MEMBERS.find(m=>m.id===booking.memberId) : null;
+            const mine = isMine(booking);
+            return <div key={slot} style={{display:"flex",alignItems:"center",gap:10,background:mine?T.teal10:T.white,border:`1px solid ${mine?T.teal20:T.g200}`,borderRadius:10,padding:"10px 14px",boxShadow:"0 1px 2px rgba(0,0,0,0.03)"}}>
+              <span style={{width:46,fontSize:13,fontWeight:700,color:mine?T.teal:booking?T.g400:T.g600,flexShrink:0}}>{slot}</span>
+              {mine ? <>
+                <Pill label="Yours" color={T.teal}/>
+                {booking.recurring&&<Pill label="Weekly" color={T.purple}/>}
+                <span style={{flex:1,fontSize:11,color:T.g400}}>your booking</span>
+                <button onClick={()=>cancelBooking(sel,day,slot)} style={{background:"none",border:"none",color:T.red,fontSize:12,fontWeight:600}}>Cancel</button>
+              </> : booking ? <>
+                <Av m={mem||{initials:"?",color:T.g400,bg:T.g100}} size={22}/>
+                <span style={{fontSize:12,color:T.g500,flex:1}}>{mem?.short||"?"}'s booking{booking.recurring?" · weekly":""}</span>
+                <Pill label="Booked" color={T.g400}/>
+              </> : <>
+                <span style={{fontSize:12,color:T.g300,flex:1}}>Available</span>
+                <button onClick={()=>setBookModal(slot)} style={{background:T.teal,border:"none",borderRadius:8,padding:"6px 14px",color:T.white,fontSize:12,fontWeight:700}}>Book</button>
+              </>}
+            </div>;
+          })}
+        </div>
+      </div>
+    </>}
+
+    {tabView==="all"&&<div style={{padding:"12px 16px 0"}}>
+      {/* Summary by member */}
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        {MEMBERS.map(m=>{
+          const cnt=allBookings.filter(b=>b.memberId===m.id).length;
+          return <Card key={m.id} style={{flex:1,padding:"10px 8px",textAlign:"center"}}>
+            <Av m={m} size={28}/>
+            <div style={{fontSize:16,fontWeight:800,color:m.color,marginTop:6}}>{cnt}</div>
+            <div style={{fontSize:10,color:T.g400,marginTop:1}}>{m.short}</div>
+          </Card>;
+        })}
+      </div>
+
+      {/* Filter by amenity */}
+      <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:12}}>
+        <button onClick={()=>setSel("all")} style={{background:sel==="all"?T.teal:T.white,border:`1.5px solid ${sel==="all"?T.teal:T.g200}`,borderRadius:20,padding:"6px 14px",color:sel==="all"?T.white:T.g600,fontSize:12,fontWeight:600,flexShrink:0}}>All</button>
+        {amenities.map(a=><button key={a.id} onClick={()=>setSel(a.id)} style={{background:sel===a.id?T.teal:T.white,border:`1.5px solid ${sel===a.id?T.teal:T.g200}`,borderRadius:20,padding:"6px 14px",color:sel===a.id?T.white:T.g600,fontSize:12,fontWeight:600,flexShrink:0}}>{a.label}</button>)}
+      </div>
+
+      {/* Grouped by day */}
+      {DAYS.map(d=>{
+        const dayBks = allBookings.filter(b=>b.day===d && (sel==="all"||b.amenityId===sel));
+        if(!dayBks.length) return null;
+        return <div key={d} style={{marginBottom:16}}>
+          <div style={{fontSize:12,fontWeight:700,color:T.g500,marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
+            <span>{d}</span>
+            <span style={{width:1,height:12,background:T.g200,display:"inline-block"}}/>
+            <span style={{color:T.g400,fontWeight:400}}>{dayBks.length} booking{dayBks.length>1?"s":""}</span>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {dayBks.map(bk=>{
+              const mine=bk.memberId===meId;
+              return <Card key={bk.key} style={{border:`1px solid ${mine?T.teal20:T.g200}`}}>
+                <div style={{padding:"11px 14px",display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:42,height:42,borderRadius:10,background:mine?T.teal10:T.g50,border:`1px solid ${mine?T.teal20:T.g200}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <span style={{color:mine?T.teal:T.g400}}><TopicIcon id={amenities.find(a=>a.id===bk.amenityId)?.icon||"living"} size={18}/></span>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:T.g800}}>{bk.amenityLabel} · {bk.slot}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3}}>
+                      <div style={{width:8,height:8,borderRadius:"50%",background:bk.memberColor,flexShrink:0}}/>
+                      <span style={{fontSize:12,color:T.g500}}>{mine?"You ("+me.name+")":bk.memberName}</span>
+                      {bk.recurring&&<Pill label="Weekly" color={T.purple}/>}
+                    </div>
+                  </div>
+                  {mine&&<button onClick={()=>cancelBooking(bk.amenityId,bk.day,bk.slot)} style={{color:T.red,background:"none",border:"none",fontSize:12,fontWeight:600,flexShrink:0}}>Cancel</button>}
+                </div>
+              </Card>;
+            })}
+          </div>
+        </div>;
+      })}
+      {allBookings.filter(b=>sel==="all"||b.amenityId===sel).length===0&&
+        <div style={{textAlign:"center",color:T.g400,fontSize:13,padding:"32px 0"}}>No bookings yet this week.</div>}
+    </div>}
+
+    {/* Book modal */}
+    {bookModal&&<div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",display:"flex",alignItems:"flex-end",zIndex:200}} onClick={()=>setBookModal(null)}>
+      <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:430,margin:"0 auto",background:T.white,borderRadius:"20px 20px 0 0",padding:"24px 24px 36px",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
+        <div style={{width:40,height:4,borderRadius:2,background:T.g200,margin:"0 auto 20px"}}/>
+        <div style={{fontSize:17,fontWeight:700,color:T.g900,marginBottom:4}}>Book {amenities.find(a=>a.id===sel)?.label}</div>
+        <div style={{fontSize:13,color:T.g400,marginBottom:20}}>{day} · {bookModal}</div>
+
+        <div style={{background:T.teal10,border:`1px solid ${T.teal20}`,borderRadius:12,padding:"12px 16px",marginBottom:16}}>
+          <div style={{fontSize:12,color:T.g500,marginBottom:6}}>Booking for</div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:32,height:32,borderRadius:"50%",background:T.teal10,border:`2px solid ${T.teal}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:T.teal}}>{me.initials}</div>
+            <span style={{fontSize:14,fontWeight:600,color:T.g800}}>{me.name}</span>
+          </div>
+        </div>
+
+        {/* Recurring toggle */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",background:T.g50,borderRadius:12,marginBottom:20}}>
+          <div>
+            <div style={{fontSize:14,fontWeight:600,color:T.g800}}>Repeat weekly</div>
+            <div style={{fontSize:12,color:T.g400,marginTop:2}}>Book this slot every {SHORT_DAYS[dayIdx]}</div>
+          </div>
+          <button onClick={()=>setRecurring(r=>!r)} style={{width:48,height:26,borderRadius:13,background:recurring?T.teal:T.g300,border:"none",position:"relative",transition:"background 0.2s",cursor:"pointer",flexShrink:0}}>
+            <div style={{width:20,height:20,borderRadius:"50%",background:T.white,position:"absolute",top:3,left:recurring?25:3,transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.18)"}}/>
+          </button>
+        </div>
+
+        <button onClick={()=>doBook(bookModal,recurring)} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700}}>
+          Confirm Booking{recurring?" · Every "+SHORT_DAYS[dayIdx]:""}
+        </button>
+        <button onClick={()=>setBookModal(null)} style={{width:"100%",background:"none",border:"none",color:T.g400,fontSize:14,fontWeight:500,padding:"12px",marginTop:4}}>Cancel</button>
+      </div>
+    </div>}
+  </div>;
+}
+
+
+// ── APP ───────────────────────────────────────────────────────────────────────
+const NAV=[
+  {id:"home",      label:"Home",      icon:Icon.home},
+  {id:"agreement", label:"Agreement", icon:Icon.agreement},
+  {id:"chores",    label:"Chores",    icon:Icon.chores},
+  {id:"expenses",  label:"Expenses",  icon:Icon.expenses},
+  {id:"amenities", label:"Amenities", icon:Icon.amenities},
+];
+
+function App() {
+  const [screen,     setScreen]     = useState("onboarding");
+  const [currentUser,setCurrentUser]= useState({name:"Leticia",initials:"LL"});
+  const [members,    setMembers]    = useState(MEMBERS_DEFAULT);
+  const noNav = screen==="onboarding"||screen==="join";
+
+  // Called by Onboard when "All joined — Go to Dashboard" is tapped
+  // payload = { name, cnt, members, household, city }
+  function handleOnboardDone(payload) {
+    if (payload && typeof payload === "object" && payload.name) {
+      const n = payload.name.trim();
+      const initials = n.split(" ").filter(Boolean).map(w=>w[0]).join("").toUpperCase().slice(0,2) || n.slice(0,2).toUpperCase();
+      setCurrentUser({name:n, initials});
+      if (payload.members && payload.members.length > 0) setMembers(payload.members);
+    }
+    setScreen("home");
+  }
+
+  // Called by JoinFlow when someone joins via invite link
+  function handleJoin(name) {
+    const n = (name||"").trim();
+    if (!n) { setScreen("home"); return; }
+    const initials = n.split(" ").filter(Boolean).map(w=>w[0]).join("").toUpperCase().slice(0,2) || n.slice(0,2).toUpperCase();
+    setCurrentUser({name:n, initials});
+    setScreen("home");
+  }
+
+  const screens={
+    onboarding:<Onboard go={handleOnboardDone}/>,
+    join:<JoinFlow go={handleJoin}/>,
+    home:<Home go={setScreen} currentUser={currentUser} members={members}/>,
+    agreement:<Agreement members={members}/>,
+    chores:<Chores members={members}/>,
+    expenses:<Expenses members={members}/>,
+    amenities:<Amenities currentUser={currentUser} members={members}/>,
+  };
+
+  return <div style={{background:T.g50,minHeight:"100vh",color:T.g900}}>
+    <div style={{background:T.white,borderBottom:`1px solid ${T.g100}`,padding:"10px 20px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <span style={{fontSize:13,fontWeight:700,color:T.g900}}>9:41</span>
+      <span style={{fontSize:14,fontWeight:800,color:T.teal,letterSpacing:-0.3}}>RoomSync</span>
+      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.g400} strokeWidth="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20" strokeWidth="3" strokeLinecap="round"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill={T.g400} stroke="none"><path d="M17 21H7c0-2.76 2.24-5 5-5s5 2.24 5 5zm5-11H2v2h20v-2zM22 5H2v2h20V5z"/><rect x="3" y="2" width="18" height="20" rx="2" fill="none" stroke={T.g400} strokeWidth="2"/></svg>
+      </div>
+    </div>
+    <div style={{overflowY:"auto",height:noNav?"calc(100vh - 44px)":"calc(100vh - 100px)"}}>{screens[screen]||screens.home}</div>
+    {!noNav&&<div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:T.white,borderTop:`1px solid ${T.g100}`,display:"flex",zIndex:100,boxShadow:"0 -4px 20px rgba(0,0,0,0.07)"}}>
+      {NAV.map(n=><button key={n.id} onClick={()=>setScreen(n.id)} style={{flex:1,padding:"9px 4px 11px",background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+        <span style={{color:screen===n.id?T.teal:T.g300,opacity:screen===n.id?1:1}}>{n.icon}</span>
+        <span style={{fontSize:10,fontWeight:screen===n.id?700:400,color:screen===n.id?T.teal:T.g400}}>{n.label}</span>
+        {screen===n.id&&<div style={{width:20,height:3,borderRadius:99,background:T.teal}}/>}
+      </button>)}
+    </div>}
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>

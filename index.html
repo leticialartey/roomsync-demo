@@ -379,7 +379,7 @@ function JoinFlow({go}) {
 }
 
 // ── ONBOARDING ────────────────────────────────────────────────────────────────
-function Onboard({go}) {
+function Onboard({go, goJoin}) {
   const [step,          setStep]          = useState(0);
   const [initiatorName, setInitiatorName] = useState("Leticia");
   const [nm,            setNm]            = useState("Sunset Ave");
@@ -435,7 +435,7 @@ function Onboard({go}) {
         ))}
       </div>
       <button onClick={()=>setStep(1)} style={{width:"100%",background:T.teal,border:"none",borderRadius:12,padding:"14px",color:T.white,fontSize:15,fontWeight:700,marginBottom:10}}>Create a household</button>
-      <button onClick={()=>go("join")} style={{width:"100%",background:"none",border:`1.5px solid ${T.g200}`,borderRadius:12,padding:"13px",color:T.g600,fontSize:14,fontWeight:500}}>I have an invite link</button>
+      <button onClick={()=>goJoin ? goJoin("join") : go("join")} style={{width:"100%",background:"none",border:`1.5px solid ${T.g200}`,borderRadius:12,padding:"13px",color:T.g600,fontSize:14,fontWeight:500}}>I have an invite link</button>
     </div>
   );
 
@@ -2437,7 +2437,7 @@ function App() {
   }
 
   const screens={
-    onboarding:<Onboard go={handleOnboardDone}/>,
+    onboarding:<Onboard go={handleOnboardDone} goJoin={setScreen}/>,
     join:<JoinFlow go={handleJoin}/>,
     home:<Home go={setScreen} currentUser={currentUser} members={members} agreementDone={agreementDone} agreeMap={agreeMap} allTopics={allTopics}/>,
     agreement:<Agreement members={members} agreeMapProp={agreeMap} setAgreeMapProp={setAgreeMap} customTopicsProp={customTopics} setCustomTopicsProp={setCustomTopics}/>,

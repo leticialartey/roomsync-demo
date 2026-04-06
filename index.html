@@ -102,7 +102,7 @@ const MEMBER_COLORS = [
   {color:T.mint,  bg:"#ECFDF5" },
 ];
 const DEMO_NAMES = [
-  {name:"Maya K.",   short:"Maya",    initials:"MK"},
+  {name:"Xiaowan S.",   short:"Xiaowan",    initials:"XS"},
   {name:"Sam R.",    short:"Sam",     initials:"SR"},
   {name:"Jordan T.", short:"Jordan",  initials:"JT"},
   {name:"Alex P.",   short:"Alex",    initials:"AP"},
@@ -129,7 +129,7 @@ function buildMembers(currentUser, cnt) {
 // Default members for screens that need them before App state is ready
 const MEMBERS_DEFAULT = [
   { id:1, name:"Leticia L.", short:"Leticia", initials:"LL", color:T.teal,  bg:T.teal10,  role:"Initiator" },
-  { id:2, name:"Maya K.",    short:"Maya",    initials:"MK", color:T.blue,  bg:T.blue10,  role:"Member" },
+  { id:2, name:"Xiaowan S.",    short:"Xiaowan",    initials:"XS", color:T.blue,  bg:T.blue10,  role:"Member" },
   { id:3, name:"Sam R.",     short:"Sam",     initials:"SR", color:T.amber, bg:T.amber10, role:"Member" },
 ];
 
@@ -547,15 +547,16 @@ function Onboard({go}) {
 }
 
 // ── HOME ──────────────────────────────────────────────────────────────────────
-function Home({go,currentUser,members}) {
+function Home({go,currentUser,members,agreementDone,agreeMap,allTopics}) {
   const MEMBERS = members || MEMBERS_DEFAULT;
-  const health=78;
+  const health = agreementDone ? 92 : 78;
   const done=7,total=10,late=1;
   const nudges=[
     {icon:Icon.chores,color:T.teal,bg:T.teal10,title:"1 chore remaining today",sub:"Take out recycling — due today",to:"chores"},
     {icon:Icon.warn,color:T.red,bg:T.red10,title:"Sam has 3 overdue chores",sub:"Clean toilet, Take out trash, Sweep entryway",to:"chores",urg:true},
     {icon:Icon.amenities,color:T.blue,bg:T.blue10,title:"Laundry slot in 30 minutes",sub:"Your 8am booking — now 7:31am",to:"amenities"},
-    {icon:Icon.agreement,color:T.amber,bg:T.amber10,title:"1 agreement item to revisit",sub:"Cleanliness standards — tap to resolve",to:"agreement"},
+    // Only show agreement nudge if NOT completed
+    ...(!agreementDone ? [{icon:Icon.agreement,color:T.amber,bg:T.amber10,title:"Agreement not yet completed",sub:"Tap to start the household agreement wizard",to:"agreement"}] : []),
   ];
 
   return <div style={{background:T.g50,minHeight:"100vh",paddingBottom:80}}>
@@ -575,7 +576,7 @@ function Home({go,currentUser,members}) {
           <Ring pct={health} size={78} sw={6} color={health>70?T.teal:T.amber}/>
         </div>
         <div style={{display:"flex",gap:8}}>
-          {[{l:"Agreement",v:"Signed",c:T.teal,to:"agreement"},{l:"Chores",v:`${done}/${total}`,c:late>0?T.red:T.teal,to:"chores"},{l:"Bookings",v:"2 today",c:T.blue,to:"amenities"}].map(m=>(
+          {[{l:"Agreement",v:agreementDone?"Signed":"Pending",c:agreementDone?T.teal:T.amber,to:"agreement"},{l:"Chores",v:`${done}/${total}`,c:late>0?T.red:T.teal,to:"chores"},{l:"Bookings",v:"2 today",c:T.blue,to:"amenities"}].map(m=>(
             <button key={m.l} onClick={()=>go(m.to)} style={{flex:1,background:T.g50,border:`1px solid ${T.g200}`,borderRadius:10,padding:"9px 6px",textAlign:"center"}}>
               <div style={{fontSize:15,fontWeight:800,color:m.c}}>{m.v}</div>
               <div style={{fontSize:10,color:T.g400,marginTop:2,fontWeight:500}}>{m.l}</div>
@@ -592,6 +593,19 @@ function Home({go,currentUser,members}) {
         <div style={{fontSize:10,color:T.g400,marginTop:1}}>{m.role}</div>
       </div>)}
     </div>
+    {/* Completed agreement banner — only shows when agreement is done */}
+    {agreementDone&&(
+      <div style={{padding:"0 16px",marginBottom:4}}>
+        <button onClick={()=>go("agreement")} style={{width:"100%",display:"flex",alignItems:"center",gap:12,background:T.teal10,border:`1.5px solid ${T.teal}`,borderRadius:14,padding:"13px 16px",textAlign:"left"}}>
+          <div style={{width:36,height:36,borderRadius:10,background:T.teal,display:"flex",alignItems:"center",justifyContent:"center",color:T.white,flexShrink:0}}>{Icon.check}</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:14,fontWeight:700,color:T.teal}}>Household Agreement — Signed</div>
+            <div style={{fontSize:12,color:T.tealDk,marginTop:2}}>All {(allTopics||[]).length} topics agreed · Tap to view or export</div>
+          </div>
+          <span style={{color:T.teal}}>{Icon.arrowR}</span>
+        </button>
+      </div>
+    )}
     <Sec label="Today's nudges"/>
     <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:8}}>
       {nudges.map((n,i)=>(
@@ -783,16 +797,19 @@ const AGREEMENT_TOPICS_DEF = [
   },
 ];
 
-function Agreement({members}) {
+function Agreement({members, agreeMapProp, setAgreeMapProp, customTopicsProp, setCustomTopicsProp}) {
   const MEMBERS = members || MEMBERS_DEFAULT;
   // answers:     { topicId: { memberId: string (single) | string[] (multi) } }
   // agreeMap:    { topicId: string | string[] }  — final agreed value
   // customTimes: { topicId: string }  — optional custom time string per topic
   // customTopics: [{ id, label, question }]  — user-added custom topics
   const [answers,      setAnswers]      = useState({});
-  const [agreeMap,     setAgreeMap]     = useState({});
+  // agreeMap and customTopics are lifted to App so they persist across navigation
+  const agreeMap      = agreeMapProp     || {};
+  const setAgreeMap   = setAgreeMapProp  || (()=>{});
+  const customTopics  = customTopicsProp  || [];
+  const setCustomTopics = setCustomTopicsProp || (()=>{});
   const [customTimes,  setCustomTimes]  = useState({});
-  const [customTopics, setCustomTopics] = useState([]);
   const [phase,        setPhase]        = useState("overview");
   const [wizardIdx,    setWizardIdx]    = useState(0);
   const [conflictId,   setConflictId]   = useState(null);
@@ -1776,7 +1793,7 @@ function Chores({members}) {
 
 // ── EXPENSES ─────────────────────────────────────────────────────────────────
 // HOW THIS WORKS:
-// - One person pays a shared bill upfront (e.g. Maya pays $87.50 hydro).
+// - One person pays a shared bill upfront (e.g. Xiaowan pays $87.50 hydro).
 // - Each other member owes their equal share ($29.17 each).
 // - "Mark as paid" = confirming you have paid the person back in real life
 //   (cash, e-transfer, etc). Money does NOT move through the app.
@@ -2387,10 +2404,16 @@ const NAV=[
 ];
 
 function App() {
-  const [screen,     setScreen]     = useState("onboarding");
-  const [currentUser,setCurrentUser]= useState({name:"Leticia",initials:"LL"});
-  const [members,    setMembers]    = useState(MEMBERS_DEFAULT);
+  const [screen,      setScreen]      = useState("onboarding");
+  const [currentUser, setCurrentUser] = useState({name:"Leticia",initials:"LL"});
+  const [members,     setMembers]     = useState(MEMBERS_DEFAULT);
+  // Agreement state lifted here so it persists across navigation
+  const [agreeMap,     setAgreeMap]     = useState({});
+  const [customTopics, setCustomTopics] = useState([]);
   const noNav = screen==="onboarding"||screen==="join";
+  // Computed: is the agreement fully complete?
+  const allTopics = [...AGREEMENT_TOPICS_DEF, ...customTopics.map(t=>({...t,icon:"bill",options:[],isCustom:true}))];
+  const agreementDone = allTopics.length > 0 && allTopics.every(t => agreeMap[t.id]);
 
   // Called by Onboard when "All joined — Go to Dashboard" is tapped
   // payload = { name, cnt, members, household, city }
@@ -2416,8 +2439,8 @@ function App() {
   const screens={
     onboarding:<Onboard go={handleOnboardDone}/>,
     join:<JoinFlow go={handleJoin}/>,
-    home:<Home go={setScreen} currentUser={currentUser} members={members}/>,
-    agreement:<Agreement members={members}/>,
+    home:<Home go={setScreen} currentUser={currentUser} members={members} agreementDone={agreementDone} agreeMap={agreeMap} allTopics={allTopics}/>,
+    agreement:<Agreement members={members} agreeMapProp={agreeMap} setAgreeMapProp={setAgreeMap} customTopicsProp={customTopics} setCustomTopicsProp={setCustomTopics}/>,
     chores:<Chores members={members}/>,
     expenses:<Expenses members={members}/>,
     amenities:<Amenities currentUser={currentUser} members={members}/>,
